@@ -9,6 +9,7 @@ Source files are never modified.
 """
 
 import html as htmllib
+import posixpath
 import re
 import shutil
 from pathlib import Path
@@ -41,12 +42,25 @@ def render(md, text):
     return md.convert(text)
 
 
-def rewrite_links(body):
+def rewrite_links(body, page_rel):
+    """Rewrite internal `.md` links to root-absolute `.html` URLs.
+
+    page_rel is the page's path relative to the output root (e.g.
+    `notes/intro.html`). Each link is resolved relative to the page's folder,
+    so `../README.md` from `notes/` lands at the repo root. Root-absolute output
+    means no per-page `../` depth to get wrong, matching `/style.css` and the
+    nav. The root `README.md` is the homepage, so a link resolving to it maps to
+    `/index.html` (it is written as index.html, not README.html).
+    """
+    page_dir = page_rel.parent.as_posix()
+
     def repl(m):
         url = m.group(2)
         if re.match(r"[a-z][a-z0-9+.-]*://", url) or url.startswith("//"):
             return m.group(0)  # leave external links alone
-        return m.group(1) + url[:-3] + ".html" + m.group(3)
+        target = posixpath.normpath(posixpath.join(page_dir, url[:-3]))
+        href = "/index.html" if target == "README" else "/" + target + ".html"
+        return m.group(1) + href + m.group(3)
 
     return LINK_RE.sub(repl, body)
 
@@ -109,7 +123,10 @@ def build(nav=False):
             out = OUTPUT / rel.with_suffix(".html")
             if rel == Path("README.md"):
                 out = OUTPUT / "index.html"
-            body = rewrite_links(render(md, path.read_text(encoding="utf-8")))
+            body = rewrite_links(
+                render(md, path.read_text(encoding="utf-8")),
+                out.relative_to(OUTPUT),
+            )
             title = pick_title(md.Meta, body, path.stem)
             rendered.append((out, title, body))
         else:
@@ -142,8 +159,12 @@ def selfcheck():
     second = render(md, "Second[^2]\n\n[^2]: bravo")
     assert "alpha" not in second, "footnote leaked between files (reset broken)"
     assert "bravo" in second
-    assert rewrite_links('<a href="foo.md#x">') == '<a href="foo.html#x">'
-    assert rewrite_links('<a href="https://x.md">') == '<a href="https://x.md">'
+    assert rewrite_links('<a href="foo.md#x">', Path("index.html")) == '<a href="/foo.html#x">'
+    assert rewrite_links('<a href="https://x.md">', Path("index.html")) == '<a href="https://x.md">'
+    # ../README.md from a nested page resolves to the homepage (index.html).
+    assert rewrite_links('<a href="../README.md">', Path("notes/intro.html")) == '<a href="/index.html">'
+    # Sibling link from a nested page stays in its folder.
+    assert rewrite_links('<a href="methods.md">', Path("notes/intro.html")) == '<a href="/notes/methods.html">'
     nav = build_nav([(Path("index.html"), "Home"), (Path("notes/a.html"), "Alpha")])
     assert '<a href="/notes/a.html">Alpha</a>' in nav
     assert "<h3>notes</h3>" in nav and 'href="/index.html"' in nav
