@@ -1,0 +1,6 @@
+dummy-repo/
+.public/
+.venv/
+.tools/
+__pycache__/
+*.local.md
