@@ -8,8 +8,8 @@ Welcome to the test corpus. This homepage stands in for a real research repo's r
 
 ## Contents
 
-- [Introduction](notes/intro.md) — what this is about
-- [Methods & Materials](notes/methods.md) — how the work was done
+- [Introduction](notes/intro.md) — some comments, blah.
+- [Methods & Materials](notes/methods.md) — yeah, yeah, go on.
 - [Appendix](notes/appendix.md) — raw notes, no frontmatter
 
 External reference for sanity: see the [Markdown spec](https://commonmark.org) (this link must survive untouched).
