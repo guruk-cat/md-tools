@@ -1,5 +1,5 @@
 ---
-title: Research Notebook
+title: Home
 ---
 
 # Research Notebook
