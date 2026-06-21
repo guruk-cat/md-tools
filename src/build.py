@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Convert a tree of markdown files into a static HTML site.
+"""
+Convert a tree of markdown files into a static HTML site.
 
 Runs from the research repo root as `.tools/build.py`.
-Reads `.md` files recursively, renders them, rewrites internal `.md` links to `.html`, wraps each in `template.html`, and writes the mirror tree under `.public/`.
+Reads `.md` files recursively, renders them, rewrites internal `.md` links to `.html`; 
+wraps each in `template.html`, and writes the mirror tree under `.public/`.
 Source files are never modified.
 """
 
@@ -33,7 +35,8 @@ def make_md():
 
 
 def render(md, text):
-    # reset() is mandatory: footnotes/meta state accumulates on the instance and would leak between files otherwise.
+    # reset() is mandatory: 
+    # footnotes/meta state accumulates on the instance and would leak between files otherwise.
     md.reset()
     return md.convert(text)
 

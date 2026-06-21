@@ -1,6 +1,8 @@
-dummy-repo/
-.public/
 .venv/
-.tools/
 __pycache__/
+
+.public/
+.tools/
+
 *.local.md
+.DS_Store
