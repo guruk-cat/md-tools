@@ -60,7 +60,33 @@ def pick_title(meta, body, stem):
     return stem
 
 
-def build():
+def build_nav(pages):
+    """Sidebar HTML: pages grouped by their output folder, link text = title.
+
+    Each distinct folder is one flat labeled group; a nested folder like
+    `notes/sub` is just its own group rather than an indented subtree.
+    ponytail: flat groups, go recursive/indented only if the tree gets deep.
+    """
+    groups = {}
+    for out, title in pages:
+        groups.setdefault(out.parent, []).append((title, out))
+    # Root group (".") first, then folders alphabetically.
+    out_lines = ['<nav class="sidebar">']
+    for folder in sorted(groups, key=lambda f: (f != Path("."), f.as_posix())):
+        if folder != Path("."):
+            out_lines.append(f"<h3>{htmllib.escape(folder.as_posix())}</h3>")
+        out_lines.append("<ul>")
+        for title, out in sorted(groups[folder], key=lambda t: t[0].lower()):
+            href = "/" + out.as_posix()
+            out_lines.append(
+                f'<li><a href="{href}">{htmllib.escape(title)}</a></li>'
+            )
+        out_lines.append("</ul>")
+    out_lines.append("</nav>")
+    return "\n".join(out_lines)
+
+
+def build(nav=False):
     if OUTPUT.exists():
         shutil.rmtree(OUTPUT)
     OUTPUT.mkdir(parents=True)
@@ -68,6 +94,9 @@ def build():
     template = TEMPLATE.read_text(encoding="utf-8")
     md = make_md()
 
+    # Phase 1: render every page and collect (output path, title) before
+    # writing, since the nav lists all pages and is identical on each one.
+    rendered = []  # (out_path, title, body)
     for path in ROOT.rglob("*"):
         # Skip dot-dirs (.tools, .public, .git, ...) entirely.
         if any(part.startswith(".") for part in path.relative_to(ROOT).parts):
@@ -82,19 +111,29 @@ def build():
                 out = OUTPUT / "index.html"
             body = rewrite_links(render(md, path.read_text(encoding="utf-8")))
             title = pick_title(md.Meta, body, path.stem)
-            page = template.replace("{{title}}", htmllib.escape(title)).replace(
-                "{{content}}", body
-            )
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text(page, encoding="utf-8")
+            rendered.append((out, title, body))
         else:
             # Non-md asset: copy through, preserving structure.
-            out = OUTPUT / rel
-            out.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(path, out)
+            asset_out = OUTPUT / rel
+            asset_out.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, asset_out)
+
+    nav_html = ""
+    if nav:
+        nav_html = build_nav([(out.relative_to(OUTPUT), title) for out, title, _ in rendered])
+
+    # Phase 2: write pages with the shared nav injected.
+    for out, title, body in rendered:
+        page = (
+            template.replace("{{title}}", htmllib.escape(title))
+            .replace("{{nav}}", nav_html)
+            .replace("{{content}}", body)
+        )
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(page, encoding="utf-8")
 
     shutil.copy2(STYLE, OUTPUT / "style.css")
-    print(f"built -> {OUTPUT}")
+    print(f"built -> {OUTPUT}" + (" (with nav)" if nav else ""))
 
 
 def selfcheck():
@@ -105,6 +144,9 @@ def selfcheck():
     assert "bravo" in second
     assert rewrite_links('<a href="foo.md#x">') == '<a href="foo.html#x">'
     assert rewrite_links('<a href="https://x.md">') == '<a href="https://x.md">'
+    nav = build_nav([(Path("index.html"), "Home"), (Path("notes/a.html"), "Alpha")])
+    assert '<a href="/notes/a.html">Alpha</a>' in nav
+    assert "<h3>notes</h3>" in nav and 'href="/index.html"' in nav
     print("selfcheck ok")
 
 
@@ -114,4 +156,4 @@ if __name__ == "__main__":
     if "--selfcheck" in sys.argv:
         selfcheck()
     else:
-        build()
+        build(nav="--nav" in sys.argv)

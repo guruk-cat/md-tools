@@ -36,6 +36,56 @@ main {
   padding: 2.5rem 1.25rem 6rem;
 }
 
+/* Sidebar exists only when built with --nav. The sibling selector shifts main
+   over only when a sidebar is present, so non-nav builds keep main centered. */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 15rem;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 1.5rem 1rem;
+  border-right: 1px solid var(--border);
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+
+.sidebar h3 {
+  margin: 1.25rem 0 0.4rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.sidebar ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar li {
+  margin: 0.2rem 0;
+}
+
+.sidebar ~ main {
+  margin-left: 15rem;
+}
+
+@media (max-width: 50rem) {
+  .sidebar {
+    position: static;
+    width: auto;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar ~ main {
+    margin-left: auto;
+  }
+}
+
 h1, h2, h3, h4 {
   line-height: 1.25;
   margin-top: 2rem;
