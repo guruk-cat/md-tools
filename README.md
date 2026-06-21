@@ -6,7 +6,7 @@ This is a basic pipeline, written in Python, for converting a bunch of markdown 
 
 It is deliberately minimal: small enough to fully own and maintain solo, with no theme or plugin ecosystem to track. It does not try to be MkDocs.
 
-This repo (`md-site/`) is where the pipeline is developed. It is not where you use it. The pipeline lives in `src/` and gets copied into your own research repo as `.tools/`. A `dummy-repo/` is included here for local testing.
+This repo (`md-pipeline/`) is where the pipeline is developed. It is not where you use it. The pipeline lives in `src/` and gets copied into your own research repo as `.tools/`. A `dummy-repo/` is included here for local testing.
 
 ## 2. Repository layout
 
