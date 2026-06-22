@@ -100,7 +100,9 @@ def build_footer(cfg):
         raise SystemExit(f"[copyright] is missing required key(s): {', '.join(missing)}")
     year = htmllib.escape(str(c["year"]))
     author = htmllib.escape(str(c["author"]))
-    tag = htmllib.escape(str(c["tag"]))
+    # tag goes through markdown so it can carry a link (e.g. a license).
+    # markdown.markdown wraps output in <p>; strip it since this is inline.
+    tag = markdown.markdown(str(c["tag"])).removeprefix("<p>").removesuffix("</p>")
     return f"<footer>Copyright {year}, {author}. {tag}</footer>"
 
 
@@ -249,6 +251,9 @@ def selfcheck():
     assert build_footer({}) == ""
     assert build_footer({"copyright": {"year": 2026, "author": "John Doe", "tag": "CC BY 4.0"}}) == \
         "<footer>Copyright 2026, John Doe. CC BY 4.0</footer>"
+    assert build_footer({"copyright": {"year": 2026, "author": "John Doe",
+        "tag": "Licensed under [CC BY-NC 4.0](https://example.com)"}}) == \
+        '<footer>Copyright 2026, John Doe. Licensed under <a href="https://example.com">CC BY-NC 4.0</a></footer>'
     try:
         build_footer({"copyright": {"author": "John Doe"}})
     except SystemExit:
