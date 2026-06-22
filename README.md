@@ -22,6 +22,7 @@ repo-root/
     assets/             ← images and other non-md files
     .tools/             ← pipeline code
         build.py
+        config.toml
         requirements.txt
         template.html
         style.css
@@ -53,7 +54,7 @@ Run the build from your research repo root.
 python .tools/build.py
 ```
 
-Pass `--nav` to generate a sidebar navigation from the folder structure. Pass `--selfcheck` to run the pipeline's internal checks without building anything.
+Site preferences (sidebar nav, copyright footer) live in `.tools/config.toml`; see `docs/config.md`. Pass `--selfcheck` to run the pipeline's internal checks without building anything.
 
 ### 3.3. Serving locally
 
@@ -69,7 +70,7 @@ Then go to http://localhost:8000/
 
 Host the research repo on GitHub (private) and connect it to remote location. If the hosting service supports GitHub integration, it will auto-build on every push to main.
 
-Set the build command to `pip install -r .tools/requirements.txt && python .tools/build.py`, adding `--nav` if you want the sidebar. Set the output directory to `.public`, typed exactly.
+Set the build command to `pip install -r .tools/requirements.txt && python .tools/build.py`. Set the output directory to `.public`, typed exactly.
 
 ## 4. How the build works
 

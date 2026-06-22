@@ -1,0 +1,12 @@
+# Site configuration. Edit and re-run the build; setup-tools.py won't overwrite this.
+
+[site-layout]
+# Generate the sidebar nav on every build.
+nav = false
+
+# Uncomment to render a copyright footer on every page.
+# All three keys are required if the section is present.
+# [copyright]
+# author = "Your Name"
+# year = 2026
+# tag = "All rights reserved."

@@ -12,6 +12,7 @@ import html as htmllib
 import posixpath
 import re
 import shutil
+import tomllib  # stdlib, Python 3.11+
 from pathlib import Path
 
 import markdown
@@ -22,6 +23,7 @@ OUTPUT = ROOT / ".public"
 TEMPLATE = SCRIPT_DIR / "template.html"
 STYLE = SCRIPT_DIR / "style.css"
 ROBOTS = SCRIPT_DIR / "robots.txt"
+CONFIG = SCRIPT_DIR / "config.toml"
 
 EXTENSIONS = ["meta", "toc", "footnotes", "tables", "fenced_code"]
 
@@ -44,7 +46,8 @@ def render(md, text):
 
 
 def rewrite_links(body, page_rel):
-    """Rewrite internal `.md` links to root-absolute `.html` URLs.
+    """
+    Rewrite internal `.md` links to root-absolute `.html` URLs.
 
     page_rel is the page's path relative to the output root (e.g.
     `notes/intro.html`). Each link is resolved relative to the page's folder,
@@ -75,8 +78,35 @@ def pick_title(meta, body, stem):
     return stem
 
 
+def load_config():
+    if not CONFIG.exists():
+        return {}
+    with CONFIG.open("rb") as f:
+        return tomllib.load(f)
+
+
+def build_footer(cfg):
+    """
+    Copyright footer HTML, or "" if no [copyright] section is configured.
+
+    When the section is present, author/year/tag are all required; a missing key
+    is a config error rather than something to paper over with a default.
+    """
+    c = cfg.get("copyright")
+    if c is None:
+        return ""
+    missing = [k for k in ("author", "year", "tag") if not c.get(k)]
+    if missing:
+        raise SystemExit(f"[copyright] is missing required key(s): {', '.join(missing)}")
+    year = htmllib.escape(str(c["year"]))
+    author = htmllib.escape(str(c["author"]))
+    tag = htmllib.escape(str(c["tag"]))
+    return f"<footer>Copyright {year}, {author}. {tag}</footer>"
+
+
 def build_nav(pages):
-    """Sidebar HTML: pages grouped by their output folder, link text = title.
+    """
+    Sidebar HTML: pages grouped by their output folder, link text = title.
 
     Each distinct folder is one flat labeled group; a nested folder like
     `notes/sub` is just its own group rather than an indented subtree.
@@ -101,7 +131,11 @@ def build_nav(pages):
     return "\n".join(out_lines)
 
 
-def build(nav=False):
+def build():
+    cfg = load_config()
+    nav = cfg.get("site-layout", {}).get("nav", False)
+    footer_html = build_footer(cfg)
+
     if OUTPUT.exists():
         shutil.rmtree(OUTPUT)
     OUTPUT.mkdir(parents=True)
@@ -109,8 +143,8 @@ def build(nav=False):
     template = TEMPLATE.read_text(encoding="utf-8")
     md = make_md()
 
-    # Phase 1: render every page and collect (output path, title) before
-    # writing, since the nav lists all pages and is identical on each one.
+    # Phase 1: render every page and collect (output path, title) before writing, 
+    # since the nav lists all pages and is identical on each one.
     rendered = []  # (out_path, title, body)
     for path in ROOT.rglob("*"):
         # Skip dot-dirs (.tools, .public, .git, ...) entirely.
@@ -146,6 +180,7 @@ def build(nav=False):
             template.replace("{{title}}", htmllib.escape(title))
             .replace("{{nav}}", nav_html)
             .replace("{{content}}", body)
+            .replace("{{footer}}", footer_html)
         )
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(page, encoding="utf-8")
@@ -170,6 +205,15 @@ def selfcheck():
     nav = build_nav([(Path("index.html"), "Home"), (Path("notes/a.html"), "Alpha")])
     assert '<a href="/notes/a.html">Alpha</a>' in nav
     assert "<h3>notes</h3>" in nav and 'href="/index.html"' in nav
+    assert build_footer({}) == ""
+    assert build_footer({"copyright": {"year": 2026, "author": "John Doe", "tag": "CC BY 4.0"}}) == \
+        "<footer>Copyright 2026, John Doe. CC BY 4.0</footer>"
+    try:
+        build_footer({"copyright": {"author": "John Doe"}})
+    except SystemExit:
+        pass
+    else:
+        assert False, "missing copyright keys should fail the build"
     print("selfcheck ok")
 
 
@@ -179,4 +223,4 @@ if __name__ == "__main__":
     if "--selfcheck" in sys.argv:
         selfcheck()
     else:
-        build(nav="--nav" in sys.argv)
+        build()

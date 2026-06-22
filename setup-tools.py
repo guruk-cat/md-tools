@@ -19,10 +19,18 @@ def main(target):
         sys.exit(f"target is not a directory: {target}")
 
     dest = target / ".tools"
+    # config.toml is excluded here so a re-run never clobbers the user's edits;
+    # it's scaffolded separately below only when absent.
     shutil.copytree(
-        SRC, dest, dirs_exist_ok=True, ignore=shutil.ignore_patterns("__pycache__")
+        SRC, dest, dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("__pycache__", "config.toml"),
     )
     print(f"copied {SRC} -> {dest}")
+
+    config = dest / "config.toml"
+    if not config.exists():
+        shutil.copy2(SRC / "config.toml", config)
+        print(f"scaffolded {config}")
 
     # Ensure the build output is never committed. 
     # Create .gitignore if absent, append the rule if it isn't already listed.
