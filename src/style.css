@@ -28,12 +28,27 @@ body {
   background: var(--bg);
   font-family: ui-monospace, Menlo, Consolas, "Roboto Mono", sans-serif;
   line-height: 1.6;
+  /* Column flex + min-height so a short page still pushes the footer to the
+     bottom of the viewport (main grows, footer rides the bottom). The fixed
+     sidebar is out of flow and unaffected. */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 main {
+  flex: 1 0 auto;
   max-width: 46rem;
   margin: 0 auto;
   padding: 2.5rem 1.25rem 6rem;
+}
+
+footer {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 /* Sidebar exists only when nav is enabled in config. It is fixed in the left
@@ -91,7 +106,8 @@ main {
    the window is too narrow to center cleanly, main shifts right and sits flush
    beside the nav instead of overlapping it. The centered term wins above 76rem;
    the 15rem floor wins below it. */
-.sidebar ~ main {
+.sidebar ~ main,
+.sidebar ~ footer {
   margin-left: max(16rem, (100% - 46rem) / 2);
 }
 
@@ -105,7 +121,8 @@ main {
     border-right: none;
     border-bottom: 1px solid var(--border);
   }
-  .sidebar ~ main {
+  .sidebar ~ main,
+  .sidebar ~ footer {
     margin-left: auto;
   }
 }
@@ -164,6 +181,5 @@ img {
 .footnote {
   font-size: 0.9rem;
   color: var(--muted);
-  border-top: 1px solid var(--border);
   margin-top: 3rem;
 }
