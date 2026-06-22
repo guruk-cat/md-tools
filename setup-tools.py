@@ -34,9 +34,6 @@ def main(target):
                 f.write("\n")
             f.write(".public/\n")
         print(f"added .public/ to {gitignore}")
-    print("next: set Cloudflare build command to")
-    print("  pip install -r .tools/requirements.txt && python .tools/build.py")
-    print("and output directory to .public")
 
 
 if __name__ == "__main__":
