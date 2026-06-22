@@ -21,6 +21,7 @@ ROOT = SCRIPT_DIR.parent          # repo root when deployed as .tools/build.py
 OUTPUT = ROOT / ".public"
 TEMPLATE = SCRIPT_DIR / "template.html"
 STYLE = SCRIPT_DIR / "style.css"
+ROBOTS = SCRIPT_DIR / "robots.txt"
 
 EXTENSIONS = ["meta", "toc", "footnotes", "tables", "fenced_code"]
 
@@ -150,6 +151,7 @@ def build(nav=False):
         out.write_text(page, encoding="utf-8")
 
     shutil.copy2(STYLE, OUTPUT / "style.css")
+    shutil.copy2(ROBOTS, OUTPUT / "robots.txt")
     print(f"built -> {OUTPUT}" + (" (with nav)" if nav else ""))
 
 

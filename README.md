@@ -25,6 +25,7 @@ repo-root/
         requirements.txt
         template.html
         style.css
+        robots.txt
     .public/            ← build output
     .gitignore
 ```
@@ -66,9 +67,9 @@ Then go to http://localhost:8000/
 
 ### 3.4. Deploy on Remote Location
 
-Host the research repo on GitHub (private) and connect it to Cloudflare Pages via the standard "Connect to Git" flow. It will auto-build on every push to main.
+Host the research repo on GitHub (private) and connect it to remote location. If the hosting service supports GitHub integration, it will auto-build on every push to main.
 
-Set the build command to `pip install -r .tools/requirements.txt && python .tools/build.py`, adding `--nav` if you want the sidebar. Set the output directory to `.public`, typed exactly; Cloudflare handles the dot prefix fine.
+Set the build command to `pip install -r .tools/requirements.txt && python .tools/build.py`, adding `--nav` if you want the sidebar. Set the output directory to `.public`, typed exactly.
 
 ## 4. How the build works
 
@@ -87,5 +88,7 @@ Non-markdown files such as images are copied through to `.public/`, preserving t
 Every build is a full clean rebuild: `.public/` is deleted and regenerated from scratch, so renamed or deleted sources leave no orphan HTML behind. For this reason you should never put hand-authored files in `.public/`.
 
 The pipeline never modifies your source files. All rewriting happens on in-memory HTML and is written only under `.public/`.
+
+The template carries a `noindex, nofollow` meta tag, and `robots.txt` (a block-everything list that also names known AI/search crawlers) is copied to the output root on every build. Both ship with the pipeline in `.tools/`, so they stay versioned with the source rather than hand-maintained. This is the site's primary anti-crawler defense; the repo being private is the other.
 
 Dependencies are pinned to exact versions in `requirements.txt`, so the build container cannot silently pull an untested version of the markdown library.
