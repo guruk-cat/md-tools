@@ -38,17 +38,17 @@ The `.gitignore` must exclude `.public/`, such that the output of the pipeline i
 ## 3. Usage
 ### 3.1. Set up the tool in your repo
 
-First, you must copy the pipeline (`src/`) into your research repo as `.tools/`. Imagining that you have a `dummy-repo/` in use, run:
+First, you must copy the pipeline (`src/`) into your research repo as `.tools/`. Run:
 
 ```sh
-python setup-tools.py /path/to/dummy-repo
+python setup-tools.py /path/to/your-repo
 ```
 
-This will overwrite any existing `.tools/`, so re-running pushes the latest pipeline. It also ensures `.gitignore` excludes `.public/`.
+This will overwrite any existing `.tools/`, so re-running pushes the latest pipeline. It also ensures `.gitignore` excludes `.public/`. Note that the `config.toml` file, if present, will not be overwritten by the script.
 
 ### 3.2. Build
 
-Run the build from your research repo root.
+Run the build from your repo root.
 
 ```sh
 python .tools/build.py
@@ -61,14 +61,12 @@ Site preferences (sidebar nav, copyright footer) live in `.tools/config.toml`; s
 The site is served from `.public/`, which is the web root. You must serve from inside it so the root-absolute links resolve.
 
 ```sh
-cd dummy-repo/.public && python3 -m http.server 8000
+cd your-repo/.public && python3 -m http.server 8000
 ```
 
 Then go to http://localhost:8000/
 
-### 3.4. Deploy on Remote Location
-
-Host the research repo on GitHub (private) and connect it to remote location. If the hosting service supports GitHub integration, it will auto-build on every push to main.
+### 3.4. Deploy on a Romote Host (e.g., Netlify, Cloudflare, or your own server)
 
 Set the build command to `pip install -r .tools/requirements.txt && python .tools/build.py`. Set the output directory to `.public`, typed exactly.
 
