@@ -26,7 +26,7 @@ body {
   margin: 0;
   color: var(--fg);
   background: var(--bg);
-  font-family: Menlo, "Roboto Mono", sans-serif;
+  font-family: ui-monospace, Menlo, Consolas, "Roboto Mono", sans-serif;
   line-height: 1.6;
 }
 
@@ -36,8 +36,10 @@ main {
   padding: 2.5rem 1.25rem 6rem;
 }
 
-/* Sidebar exists only when nav is enabled in config. The sibling selector shifts main
-   over only when a sidebar is present, so non-nav builds keep main centered. */
+/* Sidebar exists only when nav is enabled in config. It is fixed in the left
+   gutter so main stays centered in the viewport regardless of nav. Below the
+   breakpoint the gutter can't hold the nav without overlapping text, so the
+   media query drops it to static (stacked on top). */
 .sidebar {
   position: fixed;
   top: 0;
@@ -51,12 +53,27 @@ main {
   box-sizing: border-box;
 }
 
-.sidebar h3 {
-  margin: 1.25rem 0 0.4rem;
-  font-size: 0.75rem;
+.sidebar summary {
+  cursor: pointer;
+  user-select: none;          /* no text-selection highlight when clicking to fold... */
+  -webkit-user-select: none;  /* ...Safari needs the prefix; the bare one is ignored there */
+  margin: 0.6rem 0 0.3rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
+}
+
+/* Smaller native disclosure marker (the browser handles the open/closed glyph). */
+.sidebar summary::marker {
+  font-size: 0.8em;
+}
+
+/* Indent each nested level in from its summary. Nesting compounds naturally
+   because every <details> adds its own indent on top of its parent's. */
+.sidebar details > ul,
+.sidebar details > details {
+  padding-left: 0.75rem;
 }
 
 .sidebar ul {
@@ -69,11 +86,18 @@ main {
   margin: 0.2rem 0;
 }
 
+/* Center main in the viewport, but never let its left edge slide under the
+   15rem fixed nav: the max() clamps the left margin to the nav width, so once
+   the window is too narrow to center cleanly, main shifts right and sits flush
+   beside the nav instead of overlapping it. The centered term wins above 76rem;
+   the 15rem floor wins below it. */
 .sidebar ~ main {
-  margin-left: 15rem;
+  margin-left: max(16rem, (100% - 46rem) / 2);
 }
 
-@media (max-width: 50rem) {
+/* Below this, nav + main no longer fit side by side, so drop the nav to static
+   (stacked on top). ponytail: hard breakpoint, no in-between resize of the nav. */
+@media (max-width: 64rem) {
   .sidebar {
     position: static;
     width: auto;

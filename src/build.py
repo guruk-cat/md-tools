@@ -104,30 +104,64 @@ def build_footer(cfg):
     return f"<footer>Copyright {year}, {author}. {tag}</footer>"
 
 
+# Persist each folder's open/closed state across page loads. The nav is a static
+# fragment identical on every page, so without this it would reset to defaults on
+# every navigation. Keyed by folder path in localStorage.
+# ponytail: native localStorage, no framework; it's the minimum that makes fold state stick.
+NAV_FOLD_SCRIPT = """<script>
+(function () {
+  var KEY = "navfold";
+  var state = JSON.parse(localStorage.getItem(KEY) || "{}");
+  document.querySelectorAll(".sidebar details").forEach(function (d) {
+    var id = d.dataset.path;
+    if (id in state) d.open = state[id];
+    d.addEventListener("toggle", function () {
+      state[id] = d.open;
+      localStorage.setItem(KEY, JSON.stringify(state));
+    });
+  });
+})();
+</script>"""
+
+
 def build_nav(pages):
     """
-    Sidebar HTML: pages grouped by their output folder, link text = title.
+    Sidebar HTML as a collapsible tree mirroring the folder structure.
 
-    Each distinct folder is one flat labeled group; a nested folder like
-    `notes/sub` is just its own group rather than an indented subtree.
-    ponytail: flat groups, go recursive/indented only if the tree gets deep.
+    Folders render as native <details>/<summary>: the chevron and expand/collapse
+    are browser-provided. Nesting is real, so `notes/sub` is a <details> inside
+    `notes`'s <details> with a summary of just `sub`, not a flat `notes/sub` label.
+    Within a folder, files (sorted by title) come before subfolders (sorted by name).
     """
-    groups = {}
+    # tree node: {"files": [(title, out)], "dirs": {name: node}}
+    tree = {"files": [], "dirs": {}}
     for out, title in pages:
-        groups.setdefault(out.parent, []).append((title, out))
-    # Root group (".") first, then folders alphabetically.
+        node = tree
+        for part in out.parent.parts:  # () at root, ("notes",), ("notes","sub"), ...
+            node = node["dirs"].setdefault(part, {"files": [], "dirs": {}})
+        node["files"].append((title, out))
+
+    def render_node(node, path):
+        lines = []
+        files = sorted(node["files"], key=lambda t: t[0].lower())
+        if files:
+            lines.append("<ul>")
+            for title, out in files:
+                href = "/" + out.as_posix()
+                lines.append(f'<li><a href="{href}">{htmllib.escape(title)}</a></li>')
+            lines.append("</ul>")
+        for name in sorted(node["dirs"]):
+            sub = f"{path}/{name}" if path else name
+            lines.append(f'<details data-path="{htmllib.escape(sub)}">')
+            lines.append(f"<summary>{htmllib.escape(name)}</summary>")
+            lines.extend(render_node(node["dirs"][name], sub))
+            lines.append("</details>")
+        return lines
+
     out_lines = ['<nav class="sidebar">']
-    for folder in sorted(groups, key=lambda f: (f != Path("."), f.as_posix())):
-        if folder != Path("."):
-            out_lines.append(f"<h3>{htmllib.escape(folder.as_posix())}</h3>")
-        out_lines.append("<ul>")
-        for title, out in sorted(groups[folder], key=lambda t: t[0].lower()):
-            href = "/" + out.as_posix()
-            out_lines.append(
-                f'<li><a href="{href}">{htmllib.escape(title)}</a></li>'
-            )
-        out_lines.append("</ul>")
+    out_lines.extend(render_node(tree, ""))
     out_lines.append("</nav>")
+    out_lines.append(NAV_FOLD_SCRIPT)
     return "\n".join(out_lines)
 
 
@@ -202,9 +236,16 @@ def selfcheck():
     assert rewrite_links('<a href="../README.md">', Path("notes/intro.html")) == '<a href="/index.html">'
     # Sibling link from a nested page stays in its folder.
     assert rewrite_links('<a href="methods.md">', Path("notes/intro.html")) == '<a href="/notes/methods.html">'
-    nav = build_nav([(Path("index.html"), "Home"), (Path("notes/a.html"), "Alpha")])
+    nav = build_nav([
+        (Path("index.html"), "Home"),
+        (Path("notes/a.html"), "Alpha"),
+        (Path("notes/sub/b.html"), "Bravo"),
+    ])
     assert '<a href="/notes/a.html">Alpha</a>' in nav
-    assert "<h3>notes</h3>" in nav and 'href="/index.html"' in nav
+    assert "<summary>notes</summary>" in nav and 'href="/index.html"' in nav
+    # Nesting is real: `sub` is a folder inside `notes`, not a flat `notes/sub` label.
+    assert "<summary>sub</summary>" in nav and 'data-path="notes/sub"' in nav
+    assert "<summary>notes/sub</summary>" not in nav
     assert build_footer({}) == ""
     assert build_footer({"copyright": {"year": 2026, "author": "John Doe", "tag": "CC BY 4.0"}}) == \
         "<footer>Copyright 2026, John Doe. CC BY 4.0</footer>"
