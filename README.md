@@ -2,24 +2,22 @@
 
 ## 1. About
 
-This is a basic pipeline, written in Python, for converting a bunch of markdown files into html files while retaining their folder structures. Use it for generating static sites from a repository of writing and/or research material that uses Markdown.
-
-It is deliberately minimal: small enough to fully own and maintain solo, with no theme or plugin ecosystem to track. It does not try to be MkDocs.
+This is a minimal pipeline, written in Python, for converting a bunch of markdown files into html files. Use it for generating static sites from a repository of writing and/or research material that uses Markdown.
 
 This repo (`md-pipeline/`) is where the pipeline is developed. It is not where you use it. The pipeline lives in `src/` and gets copied into your own research repo as `.tools/`. A `dummy-repo/` is included here for local testing.
 
-## 2. Repository layout
+## 2. Expected layout
 
 After setup, your research repo will look something like this:
 
 ```
 repo-root/
     README.md           ← used as homepage content
-    some-docs/          ← research content dirs live at repo root; this is flexible.
-        *.md            ← research content
+    some-docs/
+        *.md
+        *.png           ← non-md assets okay
     some-other-docs/
         *.md
-    assets/             ← images and other non-md files
     .tools/             ← pipeline code
         build.py
         config.toml
@@ -27,7 +25,7 @@ repo-root/
         template.html
         style.css
         robots.txt
-    .public/            ← build output
+    .public/            ← build output, made by build.py
     .gitignore
 ```
 
@@ -44,11 +42,11 @@ First, you must copy the pipeline (`src/`) into your research repo as `.tools/`.
 python setup-tools.py /path/to/your-repo
 ```
 
-This will overwrite any existing `.tools/`, so re-running pushes the latest pipeline. It also ensures `.gitignore` excludes `.public/`. Note that the `config.toml` file, if present, will not be overwritten by the script.
+This will overwrite any existing `.tools/`, so re-running pushes the latest pipeline. It also ensures `.gitignore` excludes `.public/`. The `config.toml` file, if present, will not be overwritten by the script.
 
 ### 3.2. Build
 
-Run the build from your repo root.
+Run from your repo root:
 
 ```sh
 python .tools/build.py
@@ -70,6 +68,8 @@ Then go to http://localhost:8000/
 
 Set the build command to `pip install -r .tools/requirements.txt && python .tools/build.py`. Set the output directory to `.public`, typed exactly.
 
+Dependencies are pinned to exact versions in `requirements.txt`, so the build container cannot silently pull an untested version of the markdown library.
+
 ## 4. How the build works
 
 Conversion uses the `markdown` library with the `meta`, `toc`, `footnotes`, `tables`, and `fenced_code` extensions. The `toc` extension gives headings IDs so that `#anchor` links resolve.
@@ -89,5 +89,3 @@ Every build is a full clean rebuild: `.public/` is deleted and regenerated from 
 The pipeline never modifies your source files. All rewriting happens on in-memory HTML and is written only under `.public/`.
 
 The template carries a `noindex, nofollow` meta tag, and `robots.txt` (a block-everything list that also names known AI/search crawlers) is copied to the output root on every build. Both ship with the pipeline in `.tools/`, so they stay versioned with the source rather than hand-maintained. This is the site's primary anti-crawler defense; the repo being private is the other.
-
-Dependencies are pinned to exact versions in `requirements.txt`, so the build container cannot silently pull an untested version of the markdown library.

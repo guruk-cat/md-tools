@@ -3,8 +3,8 @@
 Convert a tree of markdown files into a static HTML site.
 
 Runs from the research repo root as `.tools/build.py`.
-Reads `.md` files recursively, renders them, rewrites internal `.md` links to `.html`; 
-wraps each in `template.html`, and writes the mirror tree under `.public/`.
+Reads `.md` files recursively, renders them, rewrites internal `.md` links to `.html`.
+Wraps each in `template.html`, and writes the mirror tree under `.public/`.
 Source files are never modified.
 """
 
@@ -12,7 +12,7 @@ import html as htmllib
 import posixpath
 import re
 import shutil
-import tomllib  # stdlib, Python 3.11+
+import tomllib
 from pathlib import Path
 
 import markdown
@@ -46,16 +46,8 @@ def render(md, text):
 
 
 def rewrite_links(body, page_rel):
-    """
-    Rewrite internal `.md` links to root-absolute `.html` URLs.
-
-    page_rel is the page's path relative to the output root (e.g.
-    `notes/intro.html`). Each link is resolved relative to the page's folder,
-    so `../README.md` from `notes/` lands at the repo root. Root-absolute output
-    means no per-page `../` depth to get wrong, matching `/style.css` and the
-    nav. The root `README.md` is the homepage, so a link resolving to it maps to
-    `/index.html` (it is written as index.html, not README.html).
-    """
+    # Rewrite internal `.md` links to root-absolute `.html` URLs.
+    # page_rel    : the page's path relative to the output root. 
     page_dir = page_rel.parent.as_posix()
 
     def repl(m):
@@ -86,12 +78,8 @@ def load_config():
 
 
 def build_footer(cfg):
-    """
-    Copyright footer HTML, or "" if no [copyright] section is configured.
+    # Copyright footer HTML, or empty string if no [copyright] section is configured.
 
-    When the section is present, author/year/tag are all required; a missing key
-    is a config error rather than something to paper over with a default.
-    """
     c = cfg.get("copyright")
     if c is None:
         return ""
@@ -106,10 +94,8 @@ def build_footer(cfg):
     return f"<footer>Copyright {year}, {author}. {tag}</footer>"
 
 
-# Persist each folder's open/closed state across page loads. The nav is a static
-# fragment identical on every page, so without this it would reset to defaults on
-# every navigation. Keyed by folder path in localStorage.
-# ponytail: native localStorage, no framework; it's the minimum that makes fold state stick.
+# Persist each folder's open/closed state across page loads.
+# Keyed by folder path in localStorage.
 NAV_FOLD_SCRIPT = """<script>
 (function () {
   var KEY = "navfold";
@@ -127,14 +113,8 @@ NAV_FOLD_SCRIPT = """<script>
 
 
 def build_nav(pages):
-    """
-    Sidebar HTML as a collapsible tree mirroring the folder structure.
+    # Sidebar HTML as a collapsible tree mirroring the folder structure.
 
-    Folders render as native <details>/<summary>: the chevron and expand/collapse
-    are browser-provided. Nesting is real, so `notes/sub` is a <details> inside
-    `notes`'s <details> with a summary of just `sub`, not a flat `notes/sub` label.
-    Within a folder, files (sorted by title) come before subfolders (sorted by name).
-    """
     # tree node: {"files": [(title, out)], "dirs": {name: node}}
     tree = {"files": [], "dirs": {}}
     for out, title in pages:
@@ -179,11 +159,10 @@ def build():
     template = TEMPLATE.read_text(encoding="utf-8")
     md = make_md()
 
-    # Phase 1: render every page and collect (output path, title) before writing, 
-    # since the nav lists all pages and is identical on each one.
+    # Render every page and collect (output path, title) before writing
     rendered = []  # (out_path, title, body)
     for path in ROOT.rglob("*"):
-        # Skip dot-dirs (.tools, .public, .git, ...) entirely.
+        # Skip dot-dirs (.tools, .public, .git, ...)
         if any(part.startswith(".") for part in path.relative_to(ROOT).parts):
             continue
         if path.is_dir():
@@ -210,7 +189,7 @@ def build():
     if nav:
         nav_html = build_nav([(out.relative_to(OUTPUT), title) for out, title, _ in rendered])
 
-    # Phase 2: write pages with the shared nav injected.
+    # Write pages with the shared nav injected.
     for out, title, body in rendered:
         page = (
             template.replace("{{title}}", htmllib.escape(title))

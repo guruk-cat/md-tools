@@ -28,9 +28,10 @@ body {
   background: var(--bg);
   font-family: ui-monospace, Menlo, Consolas, "Roboto Mono", sans-serif;
   line-height: 1.6;
-  /* Column flex + min-height so a short page still pushes the footer to the
-     bottom of the viewport (main grows, footer rides the bottom). The fixed
-     sidebar is out of flow and unaffected. */
+  /* 
+    Column flex + min-height so a short page still pushes the footer to the
+    bottom of the viewport (main grows, footer rides the bottom). The fixed
+    sidebar is out of flow and unaffected. */
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -51,10 +52,10 @@ footer {
   color: var(--muted);
 }
 
-/* Sidebar exists only when nav is enabled in config. It is fixed in the left
-   gutter so main stays centered in the viewport regardless of nav. Below the
-   breakpoint the gutter can't hold the nav without overlapping text, so the
-   media query drops it to static (stacked on top). */
+/* 
+  Sidebar exists only when nav is enabled in config. Fixed in the left gutter. 
+  Below the breakpoint the gutter can't hold the nav without overlapping text, so the
+  media query drops it to static (stacked on top). */
 .sidebar {
   position: fixed;
   top: 0;
@@ -84,8 +85,9 @@ footer {
   font-size: 0.8em;
 }
 
-/* Indent each nested level in from its summary. Nesting compounds naturally
-   because every <details> adds its own indent on top of its parent's. */
+/* 
+  Indent each nested level in from its summary. Nesting compounds naturally
+  because every <details> adds its own indent on top of its parent's. */
 .sidebar details > ul,
 .sidebar details > details {
   padding-left: 0.75rem;
@@ -101,18 +103,18 @@ footer {
   margin: 0.2rem 0;
 }
 
-/* Center main in the viewport, but never let its left edge slide under the
-   15rem fixed nav: the max() clamps the left margin to the nav width, so once
-   the window is too narrow to center cleanly, main shifts right and sits flush
-   beside the nav instead of overlapping it. The centered term wins above 76rem;
-   the 15rem floor wins below it. */
+/* 
+  Center main in the viewport, but never let its left edge slide under the
+  15rem fixed nav: the max() clamps the left margin to the nav width, so once
+  the window is too narrow to center cleanly, main shifts right and sits flush
+  beside the nav instead of overlapping it. The centered term wins above 76rem;
+  the 15rem floor wins below it. */
 .sidebar ~ main,
 .sidebar ~ footer {
   margin-left: max(16rem, (100% - 46rem) / 2);
 }
 
-/* Below this, nav + main no longer fit side by side, so drop the nav to static
-   (stacked on top). ponytail: hard breakpoint, no in-between resize of the nav. */
+/* Below this, nav + main no longer fit side by side, so drop the nav to static */
 @media (max-width: 64rem) {
   .sidebar {
     position: static;
