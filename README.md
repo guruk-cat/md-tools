@@ -88,4 +88,4 @@ Every build is a full clean rebuild: `.public/` is deleted and regenerated from 
 
 The pipeline never modifies your source files. All rewriting happens on in-memory HTML and is written only under `.public/`.
 
-The template carries a `noindex, nofollow` meta tag, and `robots.txt` (a block-everything list that also names known AI/search crawlers) is copied to the output root on every build. Both ship with the pipeline in `.tools/`, so they stay versioned with the source rather than hand-maintained. This is the site's primary anti-crawler defense; the repo being private is the other.
+The template carries a `noindex, nofollow` meta tag, and `robots.txt` is copied to the output root on every build. Both ship with the pipeline in `.tools/`, so they stay versioned with the source rather than hand-maintained. 
