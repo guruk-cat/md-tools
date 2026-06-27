@@ -61,7 +61,10 @@ def rewrite_links(body, page_rel):
     return LINK_RE.sub(repl, body)
 
 
-def pick_title(meta, body, stem):
+def pick_title(meta, body, stem, front=None):
+    # front: config override for the homepage (README), wins over everything.
+    if front:
+        return front
     if meta.get("title"):
         return meta["title"][0]
     m = H1_RE.search(body)
@@ -150,6 +153,7 @@ def build_nav(pages):
 def build():
     cfg = load_config()
     nav = cfg.get("site-layout", {}).get("nav", False)
+    front = cfg.get("site-layout", {}).get("front")
     footer_html = build_footer(cfg)
 
     if OUTPUT.exists():
@@ -171,13 +175,14 @@ def build():
         rel = path.relative_to(ROOT)
         if path.suffix == ".md":
             out = OUTPUT / rel.with_suffix(".html")
-            if rel == Path("README.md"):
+            is_readme = rel == Path("README.md")
+            if is_readme:
                 out = OUTPUT / "index.html"
             body = rewrite_links(
                 render(md, path.read_text(encoding="utf-8")),
                 out.relative_to(OUTPUT),
             )
-            title = pick_title(md.Meta, body, path.stem)
+            title = pick_title(md.Meta, body, path.stem, front if is_readme else None)
             rendered.append((out, title, body))
         else:
             # Non-md asset: copy through, preserving structure.
@@ -211,6 +216,8 @@ def selfcheck():
     second = render(md, "Second[^2]\n\n[^2]: bravo")
     assert "alpha" not in second, "footnote leaked between files (reset broken)"
     assert "bravo" in second
+    assert pick_title({"title": ["FM"]}, "<h1>H</h1>", "stem", front="Cfg") == "Cfg"
+    assert pick_title({"title": ["FM"]}, "<h1>H</h1>", "stem") == "FM"
     assert rewrite_links('<a href="foo.md#x">', Path("index.html")) == '<a href="/foo.html#x">'
     assert rewrite_links('<a href="https://x.md">', Path("index.html")) == '<a href="https://x.md">'
     # ../README.md from a nested page resolves to the homepage (index.html).

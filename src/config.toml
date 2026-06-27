@@ -4,6 +4,9 @@
 # Generate the sidebar nav on every build.
 nav = false
 
+# Override the homepage (README) title. Uncomment to use.
+# front = "Home"
+
 # Uncomment to render a copyright footer on every page.
 # All three keys are required if the section is present.
 # [copyright]
