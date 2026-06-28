@@ -196,6 +196,6 @@ img {
 
 .footnote {
   font-size: 0.9rem;
-  color: var(--muted);
+  color: var(--fg);
   margin-top: 3rem;
 }
