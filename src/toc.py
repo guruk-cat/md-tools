@@ -95,11 +95,18 @@ def strip_existing(lines):
     out, i, n = [], 0, len(lines)
     while i < n:
         if lines[i].strip() == TOC_OPEN:
+            # Find the matching close BEFORE consuming anything. 
+            j = i + 1
+            while j < n and lines[j].strip() != TOC_CLOSE:
+                j += 1
+            if j >= n:
+                raise SystemExit(
+                    f"unterminated TOC block: found '{TOC_OPEN}' with no matching "
+                    f"'{TOC_CLOSE}'. Fix the markers; refusing to write."
+                )
             if out and out[-1].strip() == "":
                 out.pop()
-            while i < n and lines[i].strip() != TOC_CLOSE:
-                i += 1
-            i += 1  # skip the close marker
+            i = j + 1  # skip past the close marker
             if i < n and lines[i].strip() == "":
                 i += 1  # skip trailing pad
             continue
@@ -210,6 +217,16 @@ def selfcheck():
 
     # custom title
     assert "## Contents" in build_toc(doc, {"toc-builder": {"toc_title": "Contents"}})
+
+    # An open marker with a missing/typo'd close must NOT truncate the file:
+    # fail closed instead of swallowing to EOF.
+    broken = "# T\n\n<!-- toc -->\n## TOC\n<!--- toc --->\n\n## A\nkeep me\n"
+    try:
+        build_toc(broken, {})
+    except SystemExit:
+        pass
+    else:
+        assert False, "unterminated TOC block should refuse, not truncate"
     print("selfcheck ok")
 
 
