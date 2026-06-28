@@ -114,7 +114,7 @@ def render_block(listed, title):
     min_level = min(level for level, _, _ in listed)
     out = [TOC_OPEN, f"## {title}"]
     for level, text, sid in listed:
-        indent = "  " * (level - min_level)
+        indent = "    " * (level - min_level)  # 4 spaces: Python-Markdown needs this to nest lists
         out.append(f"{indent}- [{text}](#{sid})")
     out.append(TOC_CLOSE)
     return out
