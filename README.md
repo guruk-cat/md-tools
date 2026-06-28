@@ -8,7 +8,7 @@ This repo hosts a set of custom-built tools for managing Markdown files. Its pri
 2. Merge files that have numbered headings and/or footnotes.
 3. Generate and append tables of contents.
 
-This repo (`md-tools/`) is where the tools are developed; it is not intended as the place where you use it. The tools lives in `src/` and gets copied into your own repo as `.tools/` (see [section 2.2.](#22-set-up-the-tools-in-your-repo)). A `dummy-repo/` is included here for local testing.
+This repo (`md-tools/`) is where the tools are developed; it is not intended as the place where you use it. The tools lives in `src/` and gets copied into your own repo as `.tools/` (see [section 2.2.](#21-set-up-the-tools-in-your-repo)). A `dummy-repo/` is included here for local testing.
 
 ## 2. General Usage
 ### 2.1. Set up the tools in your repo
