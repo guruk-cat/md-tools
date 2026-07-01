@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-Scaffold a repo's `.tools/` with its per-repo content files.
+Provision a repo's `.tools/` with the pipeline: the scripts plus its content files.
 
-    md-tools setup [--override [FILE ...]]
+    python setup.py /path/to/repo        # run from this checkout
+    md-tools setup                       # run from inside the target repo
 
-Each file is written only if absent, so re-running never clobbers your edits.
-`--override` refreshes files to the shipped defaults (all of them, or just the
-ones you name), replacing your edits.
+The scripts and requirements.txt are refreshed on every run, so a repo always
+carries the latest pipeline (and can build itself on a remote host without this
+checkout). The content files are written only if absent, so your edits survive;
+`--override` refreshes them to the shipped defaults (all, or just the ones you name).
 """
 
 import shutil
@@ -15,9 +17,10 @@ from pathlib import Path
 
 SRC = Path(__file__).resolve().parent / "src"
 
-# The per-repo, customizable files. The executable code lives on PATH, not here,
-# so `.tools/` holds only content that a repo owns and may edit or let drift.
-CONTENT = ["config.toml", "template.html", "style.css", "robots.txt", "requirements.txt"]
+# Refreshed every run; not meant to be hand-edited inside a target repo.
+CODE = ["build.py", "toc.py", "merge.py", "requirements.txt"]
+# Owned by the repo and customizable; never clobbered unless named in --override.
+CONTENT = ["config.toml", "template.html", "style.css", "robots.txt"]
 
 
 def setup(root, override=None):
@@ -28,6 +31,11 @@ def setup(root, override=None):
 
     dest = root / ".tools"
     dest.mkdir(exist_ok=True)
+
+    for name in CODE:
+        shutil.copy2(SRC / name, dest / name)
+    print(f"refreshed pipeline in {dest}")
+
     for name in CONTENT:
         target = dest / name
         existed = target.exists()

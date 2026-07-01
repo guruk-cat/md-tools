@@ -16,19 +16,19 @@ It does four things to the merged content:
 The basic form lists the files to merge.
 
 ```sh
-md-tools merge a.md b.md c.md
+python .tools/merge.py a.md b.md c.md
 ```
 
 The merged file is written to `merged.md` in the current directory. Use `-o` to choose a different base name. If the target name already exists, a numeric suffix is added (`merged-2.md`, `merged-3.md`, and so on), so an existing file is never overwritten.
 
 ```sh
-md-tools merge a.md b.md -o combined
+python .tools/merge.py a.md b.md -o combined
 ```
 
 A shell glob works when every file should take the defaults.
 
 ```sh
-md-tools merge docs/*.md
+python .tools/merge.py docs/*.md
 ```
 
 ## 3. Heading levels
@@ -40,7 +40,7 @@ Two mechanisms shift heading levels. They add together.
 Suffix a path with `:±N` to shift that file's headings. A positive number promotes the headings toward H1; a negative number demotes them toward H6.
 
 ```sh
-md-tools merge a.md b.md:+1 c.md:-2
+python .tools/merge.py a.md b.md:+1 c.md:-2
 ```
 
 Here `b.md` is promoted one level and `c.md` is demoted two. `a.md` is unchanged. Levels are clamped to the H1 to H6 range, so a shift can never push a heading out of bounds.
@@ -50,7 +50,7 @@ Here `b.md` is promoted one level and `c.md` is demoted two. `a.md` is unchanged
 `--promote N` and `--demote N` shift every heading in the merge. This shift is applied on top of each file's own per-file suffix.
 
 ```sh
-md-tools merge a.md b.md:+1 c.md --demote 1
+python .tools/merge.py a.md b.md:+1 c.md --demote 1
 ```
 
 Every heading drops one level, and `b.md` then climbs back one from its suffix, so its headings end up unchanged while the others drop.
@@ -64,13 +64,13 @@ A leading manual number on a heading is removed regardless of any other option, 
 By default the tool does not number headings. Pass `--number` to prepend nested numbers across the merged document.
 
 ```sh
-md-tools merge a.md b.md --number
+python .tools/merge.py a.md b.md --number
 ```
 
 Numbering anchors at H2 by default, so the first H2 becomes `1.`, its first H3 becomes `1.1.`, and any H1 is left unnumbered. Pass `--number-h1` to include H1 in the hierarchy instead; this also turns on numbering, so `--number` is not needed alongside it.
 
 ```sh
-md-tools merge a.md b.md --number-h1
+python .tools/merge.py a.md b.md --number-h1
 ```
 
 When a level is skipped, the gap is filled with `1`. A jump straight from H2 to H4 produces `1.` and then `1.1.1.`.

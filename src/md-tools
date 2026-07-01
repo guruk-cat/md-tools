@@ -21,6 +21,11 @@ HERE = Path(__file__).resolve().parent            # .../md-tools/src
 sys.path.insert(0, str(HERE))                     # build, toc, merge
 sys.path.insert(0, str(HERE.parent))              # setup.py at the repo root
 
+# Re-exec under the checkout's own venv if it exists and we aren't already in it.
+VENV = HERE.parent / ".venv"
+if VENV.is_dir() and Path(sys.prefix) != VENV:
+    os.execv(str(VENV / "bin" / "python"), [str(VENV / "bin" / "python"), *sys.argv])
+
 
 def serve(argv):
     port = 8000
