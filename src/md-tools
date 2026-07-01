@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+"""
+Entry point for the markdown tools.
+
+    md-tools setup [--override [FILE ...]]   scaffold ./.tools/ content files
+    md-tools build                           build the site into ./.public/
+    md-tools serve [PORT]                    serve ./.public/ (default 8000)
+    md-tools toc FILE                        insert/refresh a table of contents
+    md-tools merge FILE ... -o OUT           merge markdown files into one
+
+Commands act on the current directory, so run them from your repo root.
+"""
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+# Resolve through the symlink to the real checkout so the sibling modules import.
+HERE = Path(__file__).resolve().parent            # .../md-tools/src
+sys.path.insert(0, str(HERE))                     # build, toc, merge
+sys.path.insert(0, str(HERE.parent))              # setup.py at the repo root
+
+
+def serve(argv):
+    port = 8000
+    if argv:
+        if len(argv) != 1 or not argv[0].isdigit():
+            sys.exit("usage: md-tools serve [PORT]")
+        port = int(argv[0])
+    if not Path(".public").is_dir():
+        sys.exit("no .public/ here — run 'md-tools build' first")
+    # Serve from inside .public so the site's root-absolute links resolve.
+    os.chdir(".public")
+    subprocess.run([sys.executable, "-m", "http.server", str(port)])
+
+
+def main(argv):
+    if not argv:
+        sys.exit(__doc__.strip())
+    cmd, rest = argv[0], argv[1:]
+
+    if cmd == "setup":
+        import setup
+        setup.run_cli(rest)
+    elif cmd == "build":
+        import build
+        build.build()
+    elif cmd == "serve":
+        serve(rest)
+    elif cmd == "toc":
+        import toc
+        if len(rest) != 1:
+            sys.exit("usage: md-tools toc FILE")
+        toc.run(rest[0])
+    elif cmd == "merge":
+        import merge
+        merge.run(rest)
+    else:
+        sys.exit(f"unknown command: {cmd}\n\n{__doc__.strip()}")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

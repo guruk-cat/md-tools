@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-Copy the pipeline (src/) into a research repo as `.tools/`.
+Scaffold a repo's `.tools/` with its per-repo content files.
 
-Usage: python setup.py /path/to/research-repo
-Overwrites any existing `.tools/` so re-running pushes the latest pipeline.
+    md-tools setup [--override [FILE ...]]
+
+Each file is written only if absent, so re-running never clobbers your edits.
+`--override` refreshes files to the shipped defaults (all of them, or just the
+ones you name), replacing your edits.
 """
 
 import shutil
@@ -12,29 +15,33 @@ from pathlib import Path
 
 SRC = Path(__file__).resolve().parent / "src"
 
+# The per-repo, customizable files. The executable code lives on PATH, not here,
+# so `.tools/` holds only content that a repo owns and may edit or let drift.
+CONTENT = ["config.toml", "template.html", "style.css", "robots.txt", "requirements.txt"]
 
-def main(target):
-    target = Path(target).resolve()
-    if not target.is_dir():
-        sys.exit(f"target is not a directory: {target}")
 
-    dest = target / ".tools"
-    # config.toml is excluded here so a re-run never clobbers the user's edits;
-    # it's scaffolded separately below only when absent.
-    shutil.copytree(
-        SRC, dest, dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns("__pycache__", "config.toml"),
-    )
-    print(f"copied {SRC} -> {dest}")
+def setup(root, override=None):
+    root = Path(root).resolve()
+    if not root.is_dir():
+        sys.exit(f"target is not a directory: {root}")
+    override = set(override or ())
 
-    config = dest / "config.toml"
-    if not config.exists():
-        shutil.copy2(SRC / "config.toml", config)
-        print(f"scaffolded {config}")
+    dest = root / ".tools"
+    dest.mkdir(exist_ok=True)
+    for name in CONTENT:
+        target = dest / name
+        existed = target.exists()
+        if existed and name not in override:
+            continue
+        shutil.copy2(SRC / name, target)
+        print(f"{'overwrote' if existed else 'wrote'} {target}")
 
-    # Ensure the build output is never committed. 
-    # Create .gitignore if absent, append the rule if it isn't already listed.
-    gitignore = target / ".gitignore"
+    ensure_gitignore(root)
+
+
+def ensure_gitignore(root):
+    # The build output must never be committed; the server regenerates its own.
+    gitignore = root / ".gitignore"
     lines = gitignore.read_text(encoding="utf-8").splitlines() if gitignore.exists() else []
     if ".public/" not in lines:
         with gitignore.open("a", encoding="utf-8") as f:
@@ -44,7 +51,24 @@ def main(target):
         print(f"added .public/ to {gitignore}")
 
 
+def run_cli(argv):
+    # Optional leading positional target; defaults to the current repo.
+    root = Path.cwd()
+    if argv and not argv[0].startswith("-"):
+        root, argv = Path(argv[0]), argv[1:]
+
+    override = None
+    if argv:
+        if argv[0] != "--override":
+            sys.exit(f"unknown option: {argv[0]}\n\n{__doc__.strip()}")
+        names = argv[1:]
+        bad = [n for n in names if n not in CONTENT]
+        if bad:
+            sys.exit(f"not a content file: {', '.join(bad)}. Choose from: {', '.join(CONTENT)}")
+        override = names or CONTENT  # bare --override means all
+
+    setup(root, override)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        sys.exit("usage: python setup.py /path/to/research-repo")
-    main(sys.argv[1])
+    run_cli(sys.argv[1:])

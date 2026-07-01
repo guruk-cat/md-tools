@@ -17,13 +17,16 @@ from pathlib import Path
 
 import markdown
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-ROOT = SCRIPT_DIR.parent          # repo root when deployed as .tools/build.py
+ROOT = Path.cwd()                 # run from your repo root; the code may live elsewhere (on PATH)
+TOOLS = ROOT / ".tools"           # per-repo content files live here, not next to the code
 OUTPUT = ROOT / ".public"
-TEMPLATE = SCRIPT_DIR / "template.html"
-STYLE = SCRIPT_DIR / "style.css"
-ROBOTS = SCRIPT_DIR / "robots.txt"
-CONFIG = SCRIPT_DIR / "config.toml"
+TEMPLATE = TOOLS / "template.html"
+STYLE = TOOLS / "style.css"
+ROBOTS = TOOLS / "robots.txt"
+CONFIG = TOOLS / "config.toml"
+
+# Placeholders build() substitutes; a template missing any is stale or wrong.
+TEMPLATE_MARKERS = ("{{title}}", "{{nav}}", "{{content}}", "{{footer}}")
 
 EXTENSIONS = ["meta", "toc", "footnotes", "tables", "fenced_code"]
 
@@ -160,7 +163,15 @@ def build():
         shutil.rmtree(OUTPUT)
     OUTPUT.mkdir(parents=True)
 
+    if not TEMPLATE.exists():
+        raise SystemExit(f"missing {TEMPLATE}. Run 'md-tools setup' in this repo first.")
     template = TEMPLATE.read_text(encoding="utf-8")
+    stale = [m for m in TEMPLATE_MARKERS if m not in template]
+    if stale:
+        raise SystemExit(
+            f"{TEMPLATE} is missing placeholder(s) {', '.join(stale)}; it may be from an "
+            f"older version. Run 'md-tools setup --override template.html'. Refusing to build."
+        )
     md = make_md()
 
     # Render every page and collect (output path, title) before writing

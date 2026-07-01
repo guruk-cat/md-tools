@@ -18,8 +18,7 @@ from pathlib import Path
 
 from markdown.extensions.toc import slugify, unique
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-CONFIG = SCRIPT_DIR / "config.toml"
+CONFIG = Path.cwd() / ".tools" / "config.toml"
 
 TOC_OPEN = "<!-- toc -->"
 TOC_CLOSE = "<!-- /toc -->"
