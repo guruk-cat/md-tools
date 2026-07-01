@@ -90,11 +90,13 @@ def parse_headings(lines):
 
 def strip_existing(lines):
     # Remove a previously generated block (markers inclusive) plus the single
-    # blank line we pad it with on each side, so re-runs converge.
-    out, i, n = [], 0, len(lines)
+    # blank line we pad it with on each side, so re-runs converge. Returns
+    # (remaining_lines, block_index) where block_index is where the block sat
+    # (into remaining_lines), or None if absent.
+    out, i, n, block_idx = [], 0, len(lines), None
     while i < n:
         if lines[i].strip() == TOC_OPEN:
-            # Find the matching close BEFORE consuming anything. 
+            # Find the matching close BEFORE consuming anything.
             j = i + 1
             while j < n and lines[j].strip() != TOC_CLOSE:
                 j += 1
@@ -105,13 +107,14 @@ def strip_existing(lines):
                 )
             if out and out[-1].strip() == "":
                 out.pop()
+            block_idx = len(out)
             i = j + 1  # skip past the close marker
             if i < n and lines[i].strip() == "":
                 i += 1  # skip trailing pad
             continue
         out.append(lines[i])
         i += 1
-    return out
+    return out, block_idx
 
 
 def render_block(listed, title):
@@ -137,19 +140,22 @@ def build_toc(text, cfg):
     if had_final_nl:
         lines = lines[:-1]
 
-    lines = strip_existing(lines)
+    lines, block_idx = strip_existing(lines)
     headings, start = parse_headings(lines)
 
     result = lines
     if headings:
         sids = assign_ids(headings, slug_style)
 
-        # Insert under the topmost H1; exclude that H1 from its own TOC.
+        # Default placement is under the topmost H1 (excluded from its own TOC);
+        # if a block already exists, rewrite it exactly where the user left it.
         insert_idx, title_idx = start, None
         for level, _text, idx in headings:
             if level == 1:
                 title_idx, insert_idx = idx, idx + 1
                 break
+        if block_idx is not None:
+            insert_idx = block_idx
 
         listed = [
             (level, htext, sid)
@@ -216,6 +222,17 @@ def selfcheck():
 
     # custom title
     assert "## Contents" in build_toc(doc, {"toc-builder": {"toc_title": "Contents"}})
+
+    # Existing block is rewritten in place, not yanked back under the H1.
+    placed = (
+        "# Title\n\nintro kept above\n\n"
+        "<!-- toc -->\n## Table of Contents\n- stale\n<!-- /toc -->\n\n"
+        "## A\n\n## B\n"
+    )
+    p = build_toc(placed, {})
+    assert p.index("intro kept above") < p.index(TOC_OPEN)  # body stayed on top
+    assert "- stale" not in p                               # block refreshed
+    assert build_toc(p, {}) == p                            # idempotent in place
 
     # An open marker with a missing/typo'd close must NOT truncate the file:
     # fail closed instead of swallowing to EOF.
