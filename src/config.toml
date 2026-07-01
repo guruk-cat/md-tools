@@ -1,4 +1,4 @@
-# Site configuration. Edit and re-run the build; setup-tools.py won't overwrite this.
+# Site configuration. Edit and re-run the build; setup.py won't overwrite this.
 
 [site-layout]
 # Generate the sidebar nav on every build.

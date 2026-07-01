@@ -2,7 +2,7 @@
 """
 Copy the pipeline (src/) into a research repo as `.tools/`.
 
-Usage: python setup-tools.py /path/to/research-repo
+Usage: python setup.py /path/to/research-repo
 Overwrites any existing `.tools/` so re-running pushes the latest pipeline.
 """
 
@@ -46,5 +46,5 @@ def main(target):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        sys.exit("usage: python setup-tools.py /path/to/research-repo")
+        sys.exit("usage: python setup.py /path/to/research-repo")
     main(sys.argv[1])

@@ -8,15 +8,18 @@ This repo hosts a set of custom-built tools for managing Markdown files. Its pri
 2. Merge files that have numbered headings and/or footnotes.
 3. Generate and append tables of contents.
 
-This repo (`md-tools/`) is where the tools are developed; it is not intended as the place where you use it. The tools lives in `src/` and gets copied into your own repo as `.tools/` (see [section 2.2.](#21-set-up-the-tools-in-your-repo)). A `dummy-repo/` is included here for local testing.
+A `dummy-repo/` is included here for local testing.
 
-## 2. General Usage
+## 2. General Usage, Option A: Directly running Python scripts
+
+This repo (`md-tools/`) is where the tools are developed; it is not intended as the place where you use it. The tools lives in `src/` and gets copied into your own repo as `.tools/`. 
+
 ### 2.1. Set up the tools in your repo
 
 Run:
 
 ```sh
-python setup-tools.py /path/to/your-repo
+python setup.py /path/to/your-repo
 ```
 
 This will overwrite any existing `.tools/`, so re-running pushes the latest pipeline. It also ensures `.gitignore` excludes `.public/`. The `config.toml` file, if present, will *not* be overwritten by the script.
@@ -45,7 +48,11 @@ repo-root/
     .gitignore
 ```
 
-The `.tools/` and `.public/` directories are dot-prefixed to keep them out of a markdown editor's file view. The `.gitignore` must exclude `.public/`, such that the output of the website pipeline is never committed. (The intended usage is that the script is run on the server-side, to generate its own `.public` output.) The `setup-tools.py` script adds this exclusion for you.
+The `.tools/` and `.public/` directories are dot-prefixed to keep them out of a markdown editor's file view. The `.gitignore` must exclude `.public/`, such that the output of the website pipeline is never committed. (The intended usage is that the script is run on the server-side, to generate its own `.public` output.) The `setup.py` script adds this exclusion for you.
+
+## General Usage, Option B: Put the tools on your PATH
+
+Not implemented, yet.
 
 ## 3. Website Pipeline
 ### 3.1. Build
@@ -80,12 +87,20 @@ See the [relevant documentation](docs/web-build.md).
 
 ## 4. File Merger
 
+Run from your repo root:
+
+```sh
+python .tools/merge.py path/to/file/1 path/to/file/2 -o path/to/output
+```
+
+The script combines several markdown files into one new file. It concatenates the file bodies in the order you give, then rewrites their headings and footnotes so the result reads as a single document. For additional options, see [the docs](docs/merge.md).
+
 ## 5. TOC Generator
 
 Run from your repo root:
 
 ```sh
-python .tools/toc.py file/to/path
+python .tools/toc.py path/to/file
 ```
 
 It will generate a table of contents and append it beneath the H1 heading, if present. If no H1 heading is present, the table will be appended above the text and below the metadata block (if present). For config options, see [configuration docs](docs/config.md).

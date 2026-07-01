@@ -2,7 +2,7 @@
 
 ## 1. Usage
 
-The setup script (`setup-tools.py`) includes a scaffoleded `config.toml` in the `.tools/` directory of the target repo. You can edit this, and the build script (`build.py`) will respect preferences.
+The setup script (`setup.py`) includes a scaffoleded `config.toml` in the `.tools/` directory of the target repo. You can edit this, and the build script (`build.py`) will respect preferences.
 
 ## 2. Keys for the website builder
 
