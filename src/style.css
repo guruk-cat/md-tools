@@ -100,12 +100,22 @@ footer {
   font-size: 0.8em;
 }
 
-/* 
-  Indent each nested level in from its summary. Nesting compounds naturally
-  because every <details> adds its own indent on top of its parent's. */
+/*
+  Indent each nested level in. Nesting compounds naturally because every level
+  adds its own indent on top of its parent's. The li > rules cover 'readme' mode,
+  where a section's files nest under its README link. */
 .sidebar details > ul,
-.sidebar details > details {
+.sidebar details > details,
+.sidebar li > ul,
+.sidebar li > details {
   padding-left: 0.75rem;
+}
+
+/* 'readme' mode: set the Home link apart from the section below it. */
+.sidebar .nav-home {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .sidebar ul {

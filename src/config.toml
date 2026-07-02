@@ -1,8 +1,12 @@
 # Site configuration. Edit and re-run the build; setup.py won't overwrite this.
 
 [site-layout]
-# Generate the sidebar nav on every build.
-nav = false
+# Sidebar navigation mode:
+#   "none"   - no sidebar.
+#   "browse" - one sidebar for the whole site, as a collapsible folder tree.
+#   "readme" - global sidebar links to each top-level directory's README; opening
+#              one shows that directory's own tree (scoped), with a Home link back.
+nav = "none"
 
 # Override the homepage (README) title. Uncomment to use.
 # front = "Home"

@@ -10,7 +10,14 @@ The setup script (`setup.py`) includes a scaffoleded `config.toml` in the `.tool
 
 Used to configure layout options.
 
-- `nav`: if true, generates a sidebar navigation from the folder structure. Defaults to false.
+- `nav`: sidebar navigation mode. One of `"none"`, `"browse"`, or `"readme"`. Defaults to `"none"`. Any other value fails the build. See section 2.1.1 below.
+- `front = str` : override the homepage (README) title.
+
+#### 2.1.1. `nav` modes
+
+- `"none"`: no sidebar is rendered.
+- `"browse"`: a single sidebar, shared by every page, presenting the whole site as a collapsible tree that mirrors the folder structure. Files are listed alphabetically by title; folders are collapsible and remember their open/closed state across page loads.
+- `"readme"`: the sidebar is scoped rather than global. Root-level pages (the homepage and any markdown file next to the root README) show a global sidebar: those root pages at the top, followed by one link per top-level directory that contains its own `README.md`. Each such link points at that directory's README and is labeled by its title (frontmatter `title`, then first H1, then filename). Directories without a README are omitted. Opening a directory's README (or any page inside that directory) swaps the sidebar for a `browse`-style tree scoped to that directory alone, topped with a Home link back to the site root. A README nested deeper than a top-level directory gets no special treatment; it appears as an ordinary file within its parent directory's scoped tree.
 
 ### 2.2. `[copyright]` section
 
