@@ -5,10 +5,11 @@ Provision a repo's `.tools/` with the pipeline: the scripts plus its content fil
     python setup.py /path/to/repo        # run from this checkout
     md-tools setup                       # run from inside the target repo
 
-The scripts and requirements.txt are refreshed on every run, so a repo always
-carries the latest pipeline (and can build itself on a remote host without this
-checkout). The content files are written only if absent, so your edits survive;
-`--override` refreshes them to the shipped defaults (all, or just the ones you name).
+The scripts, requirements.txt, template.html, and style.css are refreshed on every
+run, so a repo always carries the latest pipeline (and can build itself on a remote
+host without this checkout). The content files (config.toml, robots.txt) are written
+only if absent, so your edits survive; `--override` refreshes them to the shipped
+defaults (all, or just the ones you name).
 """
 
 import shutil
@@ -18,9 +19,9 @@ from pathlib import Path
 SRC = Path(__file__).resolve().parent / "src"
 
 # Refreshed every run; not meant to be hand-edited inside a target repo.
-CODE = ["build.py", "toc.py", "merge.py", "requirements.txt"]
+CODE = ["build.py", "toc.py", "merge.py", "requirements.txt", "template.html", "style.css"]
 # Owned by the repo and customizable; never clobbered unless named in --override.
-CONTENT = ["config.toml", "template.html", "style.css", "robots.txt"]
+CONTENT = ["config.toml", "robots.txt"]
 
 
 def setup(root, override=None):
