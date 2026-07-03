@@ -8,8 +8,9 @@ Provision a repo's `.tools/` with the pipeline: the scripts plus its content fil
 The scripts, requirements.txt, template.html, and style.css are refreshed on every
 run, so a repo always carries the latest pipeline (and can build itself on a remote
 host without this checkout). The content files (config.toml, robots.txt) are written
-only if absent, so your edits survive; `--override` refreshes them to the shipped
-defaults (all, or just the ones you name).
+only if absent, so custom edits survive.
+
+`--override` refreshes them to the shipped defaults (all, or just the ones you name).
 """
 
 import shutil
@@ -18,9 +19,9 @@ from pathlib import Path
 
 SRC = Path(__file__).resolve().parent / "src"
 
-# Refreshed every run; not meant to be hand-edited inside a target repo.
-CODE = ["build.py", "toc.py", "merge.py", "requirements.txt", "template.html", "style.css"]
-# Owned by the repo and customizable; never clobbered unless named in --override.
+# Refreshed every run
+CODE = ["build.py", "toc.py", "merge.py", "notes.py", "headings.py", "requirements.txt", "template.html", "style.css"]
+# Owned by the repo and customizable; not overwritten unless named in --override
 CONTENT = ["config.toml", "robots.txt"]
 
 
@@ -61,7 +62,7 @@ def ensure_gitignore(root):
 
 
 def run_cli(argv):
-    # Optional leading positional target; defaults to the current repo.
+    # Optional leading positional target; defaults to the current repo
     root = Path.cwd()
     if argv and not argv[0].startswith("-"):
         root, argv = Path(argv[0]), argv[1:]

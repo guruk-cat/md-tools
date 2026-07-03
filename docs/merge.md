@@ -79,20 +79,22 @@ When a level is skipped, the gap is filled with `1`. A jump straight from H2 to 
 
 Each source file numbers its own footnotes independently, so `[^1]` in one file and `[^1]` in another are different notes. After merging, every reference is reassigned a unique number in order of first appearance across the whole document, and all definitions are collected at the foot.
 
-Two edge cases are handled deliberately rather than silently:
+Two edge cases:
 
 | Case | Result |
 | --- | --- |
-| A reference whose definition is absent from its source file | The reference marker is removed from the text. |
+| A reference whose definition is absent from its source file | The reference is kept and its bracket text becomes the definition (`[^Oh, yes!]` becomes `[^1]` plus `[^1]: Oh, yes!`). |
 | A definition that is never referenced | It is kept at the foot under a `[^no-ref-N]` label. |
 
-Removing orphan references means no original label survives in the body, so a literal label can never collide with a reassigned number. Keeping orphan definitions means nothing you wrote is silently dropped; an uncited note simply lands at the foot, clearly marked.
+Every surviving reference is rewritten to a freshly minted number in the same pass, so no original label lingers in the body to alias a reassigned one. That is what keeps a literal label from colliding with a reassigned number, whether the reference had a definition or not. 
 
 ## 6. Not merged
 
 Front matter is not read. If a source file begins with a YAML front-matter block (delimited by `---`), that block is dropped before merging, and only the body is used. Fenced code blocks are tracked throughout, so a `#` inside a code fence is never mistaken for a heading.
 
 ## 7. Notes
+
+The footnote logic lives in `notes.py` and the heading numbering in `headings.py`. Both are standalone tools (see the README), and `merge.py` imports them.
 
 The tool ships with a self-check covering the footnote round-trip, number stripping, heading shifts, and nested numbering. Run it against the script directly in the tools checkout:
 

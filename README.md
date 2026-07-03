@@ -5,8 +5,9 @@
 This repo hosts a set of custom-built tools for managing Markdown files. Its primary purposes are as follows:
 
 1. Build a static website from a bunch of Markdown files.
-2. Merge files that have numbered headings and/or footnotes.
-3. Generate and append a table of contents.
+2. Arrange numbered headings and footnotes.
+3. Merge files that have numbered headings and/or footnotes.
+4. Generate and append a table of contents.
 
 A `dummy-repo/` is included here for local testing.
 
@@ -40,6 +41,8 @@ repo-root/
         build.py
         toc.py
         merge.py
+        notes.py
+        headings.py
         requirements.txt
         config.toml
         template.html
@@ -59,7 +62,7 @@ For local use, you can drive the pipeline with a single `md-tools` command inste
 ln -s "$(pwd)/src/md-tools" ~/.local/bin/md-tools
 ```
 
-Then `md-tools setup`, `md-tools build`, `md-tools serve`, `md-tools toc`, and `md-tools merge` work from any repo root. The command runs under the `python3` on your PATH, so that interpreter needs the dependencies installed (`pip install -r src/requirements.txt`). This is a convenience only; a repo set up by `setup.py` still builds without it (which is what a remote host does).
+Then `md-tools setup`, `md-tools build`, `md-tools serve`, `md-tools toc`, `md-tools merge`, `md-tools notes`, and `md-tools headings` work from any repo root. The command runs under the `python3` on your PATH, so that interpreter needs the dependencies installed (`pip install -r src/requirements.txt`). This is a convenience only; a repo set up by `setup.py` still builds without it (which is what a remote host does).
 
 ## 3. Website Pipeline
 ### 3.1. Build
@@ -95,7 +98,8 @@ See the [relevant documentation](docs/web-build.md).
 Run from your repo root:
 
 ```sh
-python .tools/merge.py path/to/file/1 path/to/file/2 -o path/to/output    # or: md-tools merge ...
+python .tools/merge.py path/to/file/1 path/to/file/2 -o path/to/output    
+# or: md-tools merge ...
 ```
 
 The script combines several markdown files into one new file. It concatenates the file bodies in the order you give, then rewrites their headings and footnotes so the result reads as a single document. For additional options, see [the docs](docs/merge.md).
@@ -105,7 +109,27 @@ The script combines several markdown files into one new file. It concatenates th
 Run from your repo root:
 
 ```sh
-python .tools/toc.py path/to/file    # or: md-tools toc path/to/file
+python .tools/toc.py path/to/file       # or: md-tools toc path/to/file
 ```
 
 It will generate a table of contents and append it beneath the H1 heading, if present. If no H1 heading is present, the table will be appended above the text and below the metadata block (if present). For config options, see [configuration docs](docs/config.md).
+
+## 6. Footnote Arranger
+
+Run from your repo root:
+
+```sh
+python .tools/notes.py path/to/file     # or: md-tools notes path/to/file
+```
+
+It rewrites a single file in place, renumbering every footnote reference into one continuous sequence (by order of first appearance) and gathering all definitions at the foot. A reference whose definition is missing is kept, with its bracket text becoming the definition. A definition that is never referenced is kept under a `[^no-ref-N]` label. A file with no footnotes is left untouched. This is the same logic `merge.py` uses across files.
+
+## 7. Heading Numberer
+
+Run from your repo root:
+
+```sh
+python .tools/headings.py path/to/file  # or: md-tools headings path/to/file
+```
+
+It rewrites a single file in place, prepending nested numbers (`1.`, `1.1.`) to its headings. Any existing manual numbers are stripped first, so a re-run reproduces the same output instead of doubling. Numbering anchors at H2 by default; pass `--number-h1` to include H1. This is the same logic `merge.py` uses for its `--number` option.

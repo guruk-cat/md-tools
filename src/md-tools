@@ -7,6 +7,8 @@ Entry point for the markdown tools.
     md-tools serve [PORT]                    serve ./.public/ (default 8000)
     md-tools toc FILE                        insert/refresh a table of contents
     md-tools merge FILE ... -o OUT           merge markdown files into one
+    md-tools notes FILE                      renumber footnotes, gather at foot
+    md-tools headings FILE [--number-h1]     number headings (1., 1.1.) in place
 
 Commands act on the current directory, so run them from your repo root.
 """
@@ -18,7 +20,7 @@ from pathlib import Path
 
 # Resolve through the symlink to the real checkout so the sibling modules import.
 HERE = Path(__file__).resolve().parent            # .../md-tools/src
-sys.path.insert(0, str(HERE))                     # build, toc, merge
+sys.path.insert(0, str(HERE))                     # build, toc, merge, notes, headings
 sys.path.insert(0, str(HERE.parent))              # setup.py at the repo root
 
 # Re-exec under the checkout's own venv if it exists and we aren't already in it.
@@ -61,6 +63,12 @@ def main(argv):
     elif cmd == "merge":
         import merge
         merge.run(rest)
+    elif cmd == "notes":
+        import notes
+        notes.run(rest)
+    elif cmd == "headings":
+        import headings
+        headings.run(rest)
     else:
         sys.exit(f"unknown command: {cmd}\n\n{__doc__.strip()}")
 
