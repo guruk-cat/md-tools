@@ -16,6 +16,8 @@ from pathlib import Path
 
 FENCE_RE = re.compile(r"^\s*(```+|~~~+)")
 ATX_RE = re.compile(r"^ {0,3}(#{1,6})(?=[ \t]|$)(.*)$")
+TOC_OPEN = "<!-- toc -->"
+TOC_CLOSE = "<!-- /toc -->"
 
 
 def clamp(n, lo, hi):
@@ -73,7 +75,7 @@ def number_headings(doc, renumber, number_h1):
     if not renumber:
         return doc
     base = 1 if number_h1 else 2
-    out, fence, counters = [], None, []
+    out, fence, in_toc, counters = [], None, False, []
     for line in doc.split("\n"):
         fm = FENCE_RE.match(line)
         if fm:
@@ -84,6 +86,17 @@ def number_headings(doc, renumber, number_h1):
         if fence:
             out.append(line)
             continue
+
+        # leave a generated TOC block out of the numbering.
+        if not in_toc and line.strip() == TOC_OPEN:
+            in_toc = True
+            out.append(line)
+            continue
+        if in_toc:
+            if line.strip() == TOC_CLOSE:
+                in_toc = False
+            out.append(line)
+            continue
         parsed = parse_heading(line)
         if parsed and parsed[0] >= base:
             level, text = parsed
@@ -91,6 +104,12 @@ def number_headings(doc, renumber, number_h1):
             out.append("#" * level + " " + num + " " + text)
         else:
             out.append(line)
+    if in_toc:
+        raise SystemExit(
+            f"Unterminated TOC block: "
+            f"found '{TOC_OPEN}' with no matching '{TOC_CLOSE}'"
+            f"Refusing to write."
+        )
     return "\n".join(out)
 
 
@@ -132,6 +151,13 @@ def selfcheck():
     # Idempotent: re-numbering an already-numbered doc reproduces it
     once = number_headings("## Intro\n\n### Detail", renumber=True, number_h1=False)
     assert number_headings(once, renumber=True, number_h1=False) == once
+
+    # TOC block is skipped 
+    # Its '## Table of Contents' stays unnumbered and does not consume a counter
+    withtoc = "<!-- toc -->\n## Table of Contents\n- [A](#a)\n<!-- /toc -->\n\n## A"
+    assert number_headings(withtoc, renumber=True, number_h1=False) == (
+        "<!-- toc -->\n## Table of Contents\n- [A](#a)\n<!-- /toc -->\n\n## 1. A"
+    )
 
     print("selfcheck ok")
 
