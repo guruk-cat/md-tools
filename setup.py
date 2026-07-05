@@ -20,9 +20,9 @@ from pathlib import Path
 SRC = Path(__file__).resolve().parent / "src"
 
 # Refreshed every run
-CODE = ["build.py", "toc.py", "merge.py", "notes.py", "headings.py", "requirements.txt", "template.html", "style.css", "robots.txt"]
+CODE = ["build.py", "toc.py", "merge.py", "notes.py", "headings.py", "requirements.txt", "template.html", "robots.txt"]
 # Owned by the repo and customizable; not overwritten unless --override
-CONTENT = ["config.toml"]
+CONTENT = ["style.css", "config.toml"]
 
 
 def setup(root, override=None):

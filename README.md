@@ -23,7 +23,7 @@ Run, from this checkout:
 python setup.py /path/to/your-repo
 ```
 
-This copies the pipeline (the scripts, `requirements.txt`, `template.html`, `style.css`, and `robots.txt`) into the target's `.tools/`, refreshing them on every run so a re-run pushes the latest version. The user config (`config.toml`) is written only if absent, so edits are never clobbered; pass `--override` to refresh those to the shipped defaults. It also ensures `.gitignore` excludes `.public/`.
+This copies the pipeline (the scripts, `requirements.txt`, `template.html`, and `robots.txt`) into the target's `.tools/`, refreshing them on every run so a re-run pushes the latest version. The user-edited files (`config.toml` and `style.css`) is written only if absent, so edits are never clobbered; pass `--override` to refresh those to the shipped defaults. It also ensures `.gitignore` excludes `.public/`.
 
 ### 2.2. Expected layout
 
