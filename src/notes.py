@@ -14,6 +14,7 @@ from pathlib import Path
 REF_RE = re.compile(r"\[\^([^\]]+)\](?!\()")
 DEF_RE = re.compile(r"^\[\^([^\]]+)\]:[ \t]?(.*)$")
 CONT_RE = re.compile(r"^[ \t]+\S")
+NOTES_MARKER = "<!-- notes -->"
 
 
 def trim_blank(text):
@@ -33,13 +34,17 @@ def format_def(label, text_lines):
 
 
 def renumber_footnotes(segments):
-    # File-aware: each segment resolves references against its own definitions,
-    # so identical labels in different segments are distinct notes. 
-    # Every surviving reference is rewritten to a freshly minted number in the same
-    # pass, so no original label lingers in the body to alias a reassigned one.
-    # A reference with no definition in its segment keeps its bracket text as the
-    # synthesized definition; a definition never referenced is kept under a
-    # separate [^no-ref-N] label.
+    '''
+    File-aware: each segment resolves references against its own definitions,
+    so identical labels in different segments are distinct notes. 
+
+    Every surviving reference is rewritten to a freshly minted number in the same
+    pass, so no original label lingers in the body to alias a reassigned one.
+
+    A reference with no definition in its segment keeps its bracket text as the
+    synthesized definition; a definition never referenced is kept under a
+    separate [^no-ref-N] label.
+    '''
     counter = noref_counter = 0
     definitions = []
     out_segments = []
@@ -101,7 +106,16 @@ def arrange(text):
     segments, definitions = renumber_footnotes([text])
     body = "\n\n".join(segments)
     if definitions:
-        body = body.rstrip() + "\n\n" + "\n".join(definitions) + "\n"
+        defs = "\n".join(definitions)
+        lines = body.split("\n")
+        marker_idx = next(
+            (i for i, l in enumerate(lines) if l.strip() == NOTES_MARKER), None
+        )
+        if marker_idx is not None:
+            lines[marker_idx : marker_idx + 1] = [NOTES_MARKER, defs]
+            body = "\n".join(lines)
+        else:
+            body = body.rstrip() + "\n\n" + NOTES_MARKER + "\n" + defs
     if not body.endswith("\n"):
         body += "\n"
     return body
@@ -145,7 +159,12 @@ def selfcheck():
     # Single-file arrange synthesizes a definition from an undefined reference.
     out = arrange("Look here[^Oh, yes!].\n")
     assert "Look here[^1]." in out
-    assert "[^1]: Oh, yes!" in out
+    assert out.rstrip().endswith(NOTES_MARKER + "\n[^1]: Oh, yes!")
+
+    # An existing marker keeps its position; defs land right beneath it.
+    out = arrange("A[^1]\n\n<!-- notes -->\n[^1]: old\n\nafter\n")
+    assert "<!-- notes -->\n[^1]: old\n\nafter" in out
+    assert out.count(NOTES_MARKER) == 1
 
     # A footnote-free document is returned untouched.
     plain = "# Title\n\nJust prose.\n"
