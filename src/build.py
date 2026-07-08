@@ -126,7 +126,8 @@ NAV_SCRIPT = """<script>
 </script>"""
 
 
-HOME_LINK = '<ul class="nav-home"><li><a href="/index.html">Home</a></li></ul>'
+def home_link(title):
+    return f'<ul class="nav-home"><li><a href="/index.html">{htmllib.escape(title)}</a></li></ul>'
 
 
 def nav_tree(pages):
@@ -182,6 +183,10 @@ def build_readme_navs(pages):
         else:
             sections.setdefault(out.parts[0], []).append((out, title))
 
+    # Back-home link reuses the homepage's own title (which already carries the
+    # `front` config override), so it matches the pinned entry in the global nav.
+    home_title = next((t for o, t in root_files if o == Path("index.html")), "Home")
+
     lines, section_items, scoped = [], [], {}
     if root_files:
         # Homepage pinned first; the rest of the root files follow alphabetically.
@@ -208,7 +213,7 @@ def build_readme_navs(pages):
             section_items.append(f"<li>{link}</li>")
         else:
             section = render_tree(node, name)
-        scoped[name] = wrap_nav([HOME_LINK, *section])
+        scoped[name] = wrap_nav([home_link(home_title), *section])
 
     if section_items:
         lines.append("<ul>" + "".join(section_items) + "</ul>")
@@ -337,7 +342,7 @@ def selfcheck():
     # still need a sidebar when reached directly).
     assert set(scoped) == {"notes", "misc"}
     ns = scoped["notes"]
-    assert HOME_LINK in ns                              # back-home link on top
+    assert home_link("Home") in ns                      # back-home link on top, using homepage title
     # The section README heads the scope once; its siblings nest under it.
     assert 'href="/notes/README.html">Notes' in ns and ns.count("/notes/README.html") == 1
     assert 'href="/notes/intro.html">Intro' in ns
