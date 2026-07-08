@@ -102,6 +102,24 @@ def build_footer(cfg):
     return f"<footer>Copyright {year}, {author}. {tag}</footer>"
 
 
+def build_masthead(cfg):
+    # Outbound-link bar for the homepage; "" if [header] absent or show=false.
+    # A link missing a key aborts the build.
+    h = cfg.get("header")
+    if not h or not h.get("show"):
+        return ""
+    items = []
+    for link in h.get("link", []):
+        if not link.get("name") or not link.get("url"):
+            raise SystemExit("[[header.link]] entries each need both 'name' and 'url'")
+        name = htmllib.escape(str(link["name"]))
+        url = htmllib.escape(str(link["url"]))
+        items.append(f'<a href="{url}">{name}</a>')
+    if not items:
+        return ""
+    return '<nav class="masthead">' + "".join(items) + "</nav>"
+
+
 # Reveal the current page: open the ancestor <details> chain of whichever
 # sidebar link matches this URL, leaving every other folder collapsed.
 NAV_SCRIPT = """<script>
@@ -227,6 +245,7 @@ def build():
         raise SystemExit(f"[site-layout] nav must be one of {', '.join(NAV_MODES)}; got {nav!r}")
     front = cfg.get("site-layout", {}).get("front")
     footer_html = build_footer(cfg)
+    masthead_html = build_masthead(cfg)
 
     if OUTPUT.exists():
         shutil.rmtree(OUTPUT)
@@ -262,6 +281,8 @@ def build():
                 render(md, path.read_text(encoding="utf-8")),
                 out.relative_to(OUTPUT),
             )
+            if is_readme:
+                body = masthead_html + body   # homepage only, atop the content column
             title = pick_title(md.Meta, body, path.stem, front if is_readme else None)
             rendered.append((out, title, body))
         else:
@@ -349,6 +370,20 @@ def selfcheck():
     # A nested README is just an ordinary browsable file inside its folder.
     assert 'href="/notes/deep/README.html">Deep' in ns and "<summary>deep</summary>" in ns
     assert "/about.html" not in ns                      # otherwise strictly scoped
+    assert build_masthead({}) == ""
+    assert build_masthead({"header": {"show": False}}) == ""
+    assert build_masthead({"header": {"show": True}}) == ""   # no links -> no bar
+    m = build_masthead({"header": {"show": True, "link": [
+        {"name": "me.org", "url": "https://me.org"},
+        {"name": "Blog", "url": "https://blog.me.org"}]}})
+    assert m.index("me.org") < m.index("Blog")   # left-to-right, config order
+    assert 'href="https://me.org"' in m and 'class="masthead"' in m
+    try:
+        build_masthead({"header": {"show": True, "link": [{"name": "x"}]}})
+    except SystemExit:
+        pass
+    else:
+        assert False, "a header link missing url should fail the build"
     assert build_footer({}) == ""
     assert build_footer({"copyright": {"year": 2026, "author": "John Doe", "tag": "CC BY 4.0"}}) == \
         "<footer>Copyright 2026, John Doe. CC BY 4.0</footer>"

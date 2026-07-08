@@ -11,6 +11,16 @@ nav = "none"
 # Override the homepage (README) title. Uncomment to use.
 # front = "Home"
 
+# Outbound links atop the homepage
+# [header]
+# show = true
+# [[header.link]]
+# name = "me.org"
+# url = "https://me.org"
+# [[header.link]]
+# name = "Blog"
+# url = "https://blog.me.org"
+
 # Uncomment to render a copyright footer on every page.
 # All three keys are required if the section is present.
 # [copyright]
