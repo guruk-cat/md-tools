@@ -102,20 +102,23 @@ def build_footer(cfg):
     return f"<footer>Copyright {year}, {author}. {tag}</footer>"
 
 
-# Persist each folder's open/closed state across page loads.
-# Keyed by folder path in localStorage.
-NAV_FOLD_SCRIPT = """<script>
+# Reveal the current page: open the ancestor <details> chain of whichever
+# sidebar link matches this URL, leaving every other folder collapsed.
+NAV_SCRIPT = """<script>
 (function () {
-  var KEY = "navfold";
-  var state = JSON.parse(localStorage.getItem(KEY) || "{}");
-  document.querySelectorAll(".sidebar details").forEach(function (d) {
-    var id = d.dataset.path;
-    if (id in state) d.open = state[id];
-    d.addEventListener("toggle", function () {
-      state[id] = d.open;
-      localStorage.setItem(KEY, JSON.stringify(state));
-    });
-  });
+  var here = decodeURIComponent(location.pathname);
+  if (here === "/" || here === "") here = "/index.html";
+  var links = document.querySelectorAll(".sidebar a");
+  for (var i = 0; i < links.length; i++) {
+    if (links[i].getAttribute("href") === here) {
+      var el = links[i].parentElement;
+      while (el) {
+        if (el.tagName === "DETAILS") el.open = true;
+        el = el.parentElement;
+      }
+      break;
+    }
+  }
 })();
 </script>"""
 
@@ -155,7 +158,7 @@ def render_tree(node, path):
 
 
 def wrap_nav(lines):
-    return "\n".join(['<nav class="sidebar">', *lines, "</nav>", NAV_FOLD_SCRIPT])
+    return "\n".join(['<nav class="sidebar">', *lines, "</nav>", NAV_SCRIPT])
 
 
 def build_browse_nav(pages):
@@ -309,6 +312,8 @@ def selfcheck():
     # Nesting is real: `sub` is a folder inside `notes`, not a flat `notes/sub` label.
     assert "<summary>sub</summary>" in nav and 'data-path="notes/sub"' in nav
     assert "<summary>notes/sub</summary>" not in nav
+    # Sidebar reveals the current page instead of persisting fold state.
+    assert "location.pathname" in nav and "localStorage" not in nav
 
     g, scoped = build_readme_navs([
         (Path("index.html"), "Home"),
