@@ -106,11 +106,14 @@ def build_footer(cfg):
 # sidebar link matches this URL, leaving every other folder collapsed.
 NAV_SCRIPT = """<script>
 (function () {
-  var here = decodeURIComponent(location.pathname);
-  if (here === "/" || here === "") here = "/index.html";
+  function norm(p) {
+    return decodeURIComponent(p)
+      .replace(/\\/+$/, "").replace(/\\.html$/, "").replace(/\\/index$/, "");
+  }
+  var here = norm(location.pathname);
   var links = document.querySelectorAll(".sidebar a");
   for (var i = 0; i < links.length; i++) {
-    if (links[i].getAttribute("href") === here) {
+    if (norm(links[i].getAttribute("href")) === here) {
       var el = links[i].parentElement;
       while (el) {
         if (el.tagName === "DETAILS") el.open = true;
