@@ -73,7 +73,7 @@ Run from your repo root:
 python .tools/build.py        # or, with the PATH command: md-tools build
 ```
 
-Site preferences (sidebar nav, header, footer) live in `.tools/config.toml`; see the [configuration docs](docs/config.md). If `template.html` is missing or is an older version that lacks a required placeholder, the build refuses to run and tells you to re-scaffold it. Pass `--selfcheck` to run the pipeline's internal checks without building anything.
+Site preferences (sidebar nav, header, footer) live in `.tools/config.toml`; see the [configuration docs](docs/config.md). If `template.html` is missing or is an older version that lacks a required placeholder, the build refuses to run and tells you to re-scaffold it.
 
 ### 3.2. Serving locally
 
