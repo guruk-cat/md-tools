@@ -11,7 +11,7 @@ The setup script (`setup.py`) includes a scaffoleded `config.toml` in the `.tool
 Used to configure layout options.
 
 - `nav`: sidebar navigation mode. One of `"none"`, `"browse"`, or `"readme"`. Defaults to `"none"`. Any other value fails the build. See section 2.1.1 below.
-- `front = str` : override the homepage (README) title.
+- `home = str` : override the homepage (README) title.
 
 #### 2.1.1. `nav` modes
 
@@ -21,22 +21,26 @@ Used to configure layout options.
 
 ### 2.2. `[header]` section
 
-Renders a static bar of outbound links at the top of the homepage (the repo-level README), aligned with the body text. The bar sits in normal document flow rather than being pinned, so it scrolls away as the visitor reads. It appears only on the homepage and is independent of the sidebar.
+Renders a static bar of outbound links at the top of a page, aligned with the body text. The bar sits in normal document flow rather than being pinned, so it scrolls away as the visitor reads. It is independent of the sidebar.
 
-- `show`: whether to render the bar. The section is ignored if this is absent or false.
-- `[[header.link]]`: one entry per link, each with a `name` and a `url`. 
+- `show`: which pages carry the bar. One of `"disabled"`, `"home"`, or `"not home"`. Defaults to `"disabled"` (also the effect when the section is absent). Any other value fails the build.
+- `[[header.link]]`: one entry per link, each with a `name` and a `url`. A link missing either key fails the build.
 
-If `show` is true but no links are given, no bar is rendered.
+The `show` modes are:
 
-### 2.3. `[copyright]` section
+- `"disabled"`: the bar is never rendered.
+- `"home"`: the bar renders on the homepage (the repo-level README) only.
+- `"not home"`: the bar renders on every page except the homepage.
 
-A copyright footer is generated if section is present. When present, all three keys are required; a missing key fails the build.
+If `show` is enabled but no links are given, no bar is rendered.
 
-- `author`
-- `year`
-- `tag`: something like "C.C. by 4.0" or "All rights reserved."
+### 2.3. `[footer]` section
 
-Output: "Copyright <year>, <author>. <tag>"
+A footer is generated on every page if the section is present. It holds one or more lines.
+
+- `[[footer.line]]`: one entry per line, each with a `text`. A line missing `text` fails the build.
+
+Each line's `text` is rendered as markdown, so it can mix plain words and inline links (for example, `"Licensed through [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)"`). Lines are stacked in the order given.
 
 ## 3. Keys for file merging
 

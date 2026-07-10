@@ -66,10 +66,10 @@ def rewrite_links(body, page_rel):
     return LINK_RE.sub(repl, body)
 
 
-def pick_title(meta, body, stem, front=None):
-    # front: config override for the homepage (README), wins over everything.
-    if front:
-        return front
+def pick_title(meta, body, stem, home=None):
+    # home: config override for the homepage (README), wins over everything.
+    if home:
+        return home
     if meta.get("title"):
         return meta["title"][0]
     m = H1_RE.search(body)
@@ -86,28 +86,38 @@ def load_config():
 
 
 def build_footer(cfg):
-    # Copyright footer HTML, or empty string if no [copyright] section is configured.
-
-    c = cfg.get("copyright")
-    if c is None:
+    # Footer HTML from [footer] lines, or "" if no [footer] section is configured.
+    # Each [[footer.line]] carries `text` rendered as markdown
+    f = cfg.get("footer")
+    if f is None:
         return ""
-    missing = [k for k in ("author", "year", "tag") if not c.get(k)]
-    if missing:
-        raise SystemExit(f"[copyright] is missing required key(s): {', '.join(missing)}")
-    year = htmllib.escape(str(c["year"]))
-    author = htmllib.escape(str(c["author"]))
-    # tag goes through markdown so it can carry a link (e.g. a license).
-    # markdown.markdown wraps output in <p>; strip it since this is inline.
-    tag = markdown.markdown(str(c["tag"])).removeprefix("<p>").removesuffix("</p>")
-    return f"<footer>Copyright {year}, {author}. {tag}</footer>"
+    lines = []
+    for line in f.get("line", []):
+        text = line.get("text")
+        if not text:
+            raise SystemExit("[[footer.line]] entries each need a 'text'")
+        # markdown.markdown wraps output in <p>; strip it since each line is inline.
+        html = markdown.markdown(str(text)).removeprefix("<p>").removesuffix("</p>")
+        lines.append(f"<div>{html}</div>")
+    if not lines:
+        return ""
+    return "<footer>" + "".join(lines) + "</footer>"
+
+
+HEADER_MODES = ("disabled", "home", "not home")
 
 
 def build_masthead(cfg):
-    # Outbound-link bar for the homepage; "" if [header] absent or show=false.
-    # A link missing a key aborts the build.
+    # (mode, html): mode decides which pages carry the bar 
+    # ("home" | "not home" | "disabled")
     h = cfg.get("header")
-    if not h or not h.get("show"):
-        return ""
+    if not h:
+        return ("disabled", "")
+    mode = h.get("show", "disabled")
+    if mode not in HEADER_MODES:
+        raise SystemExit(f"[header] show must be one of {', '.join(HEADER_MODES)}; got {mode!r}")
+    if mode == "disabled":
+        return (mode, "")
     items = []
     for link in h.get("link", []):
         if not link.get("name") or not link.get("url"):
@@ -116,8 +126,8 @@ def build_masthead(cfg):
         url = htmllib.escape(str(link["url"]))
         items.append(f'<a href="{url}">{name}</a>')
     if not items:
-        return ""
-    return '<nav class="masthead">' + "".join(items) + "</nav>"
+        return (mode, "")
+    return (mode, '<nav class="masthead">' + "".join(items) + "</nav>")
 
 
 # Reveal the current page: open the ancestor <details> chain of whichever
@@ -202,7 +212,7 @@ def build_readme_navs(pages):
             sections.setdefault(out.parts[0], []).append((out, title))
 
     # Back-home link reuses the homepage's own title (which already carries the
-    # `front` config override), so it matches the pinned entry in the global nav.
+    # `home` config override), so it matches the pinned entry in the global nav.
     home_title = next((t for o, t in root_files if o == Path("index.html")), "Home")
 
     lines, section_items, scoped = [], [], {}
@@ -243,9 +253,9 @@ def build():
     nav = cfg.get("site-layout", {}).get("nav", "none")
     if nav not in NAV_MODES:
         raise SystemExit(f"[site-layout] nav must be one of {', '.join(NAV_MODES)}; got {nav!r}")
-    front = cfg.get("site-layout", {}).get("front")
+    home = cfg.get("site-layout", {}).get("home")
     footer_html = build_footer(cfg)
-    masthead_html = build_masthead(cfg)
+    header_mode, masthead_html = build_masthead(cfg)
 
     if OUTPUT.exists():
         shutil.rmtree(OUTPUT)
@@ -281,9 +291,13 @@ def build():
                 render(md, path.read_text(encoding="utf-8")),
                 out.relative_to(OUTPUT),
             )
-            if is_readme:
-                body = masthead_html + body   # homepage only, atop the content column
-            title = pick_title(md.Meta, body, path.stem, front if is_readme else None)
+            show_masthead = masthead_html and (
+                (header_mode == "home" and is_readme)
+                or (header_mode == "not home" and not is_readme)
+            )
+            if show_masthead:
+                body = masthead_html + body   # atop the content column
+            title = pick_title(md.Meta, body, path.stem, home if is_readme else None)
             rendered.append((out, title, body))
         else:
             # Non-md asset: copy through, preserving structure.
@@ -323,7 +337,7 @@ def selfcheck():
     second = render(md, "Second[^2]\n\n[^2]: bravo")
     assert "alpha" not in second, "footnote leaked between files (reset broken)"
     assert "bravo" in second
-    assert pick_title({"title": ["FM"]}, "<h1>H</h1>", "stem", front="Cfg") == "Cfg"
+    assert pick_title({"title": ["FM"]}, "<h1>H</h1>", "stem", home="Cfg") == "Cfg"
     assert pick_title({"title": ["FM"]}, "<h1>H</h1>", "stem") == "FM"
     assert rewrite_links('<a href="foo.md#x">', Path("index.html")) == '<a href="/foo.html#x">'
     assert rewrite_links('<a href="https://x.md">', Path("index.html")) == '<a href="https://x.md">'
@@ -370,32 +384,41 @@ def selfcheck():
     # A nested README is just an ordinary browsable file inside its folder.
     assert 'href="/notes/deep/README.html">Deep' in ns and "<summary>deep</summary>" in ns
     assert "/about.html" not in ns                      # otherwise strictly scoped
-    assert build_masthead({}) == ""
-    assert build_masthead({"header": {"show": False}}) == ""
-    assert build_masthead({"header": {"show": True}}) == ""   # no links -> no bar
-    m = build_masthead({"header": {"show": True, "link": [
+    assert build_masthead({}) == ("disabled", "")
+    assert build_masthead({"header": {"show": "disabled"}}) == ("disabled", "")
+    assert build_masthead({"header": {"show": "home"}}) == ("home", "")   # no links -> no bar
+    mode, m = build_masthead({"header": {"show": "not home", "link": [
         {"name": "me.org", "url": "https://me.org"},
         {"name": "Blog", "url": "https://blog.me.org"}]}})
+    assert mode == "not home"
     assert m.index("me.org") < m.index("Blog")   # left-to-right, config order
     assert 'href="https://me.org"' in m and 'class="masthead"' in m
     try:
-        build_masthead({"header": {"show": True, "link": [{"name": "x"}]}})
+        build_masthead({"header": {"show": True}})   # bool no longer valid
+    except SystemExit:
+        pass
+    else:
+        assert False, "a non-enum header show should fail the build"
+    try:
+        build_masthead({"header": {"show": "home", "link": [{"name": "x"}]}})
     except SystemExit:
         pass
     else:
         assert False, "a header link missing url should fail the build"
     assert build_footer({}) == ""
-    assert build_footer({"copyright": {"year": 2026, "author": "John Doe", "tag": "CC BY 4.0"}}) == \
-        "<footer>Copyright 2026, John Doe. CC BY 4.0</footer>"
-    assert build_footer({"copyright": {"year": 2026, "author": "John Doe",
-        "tag": "Licensed under [CC BY-NC 4.0](https://example.com)"}}) == \
-        '<footer>Copyright 2026, John Doe. Licensed under <a href="https://example.com">CC BY-NC 4.0</a></footer>'
+    assert build_footer({"footer": {"line": [{"text": "© 2026 John Doe"}]}}) == \
+        "<footer><div>© 2026 John Doe</div></footer>"
+    assert build_footer({"footer": {"line": [
+        {"text": "Licensed through [CC BY-NC](https://example.com)"},
+        {"text": "Made by John Doe"}]}}) == \
+        ('<footer><div>Licensed through <a href="https://example.com">CC BY-NC</a></div>'
+         "<div>Made by John Doe</div></footer>")
     try:
-        build_footer({"copyright": {"author": "John Doe"}})
+        build_footer({"footer": {"line": [{"url": "https://example.com"}]}})
     except SystemExit:
         pass
     else:
-        assert False, "missing copyright keys should fail the build"
+        assert False, "a footer line missing text should fail the build"
     print("selfcheck ok")
 
 
