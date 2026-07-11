@@ -42,14 +42,16 @@ A footer is generated on every page if the section is present. It holds one or m
 
 Each line's `text` is rendered as markdown, so it can mix plain words and inline links (for example, `"Licensed through [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)"`). Lines are stacked in the order given.
 
-## 3. Keys for file merging
+## 3. Keys for TOC building
 
-## 4. Keys for TOC building
-
-### 4.1. `[toc-builder]` section
-
-Options for the standalone TOC builder (`toc.py`), which inserts a table of contents into each `.md` file in place (under the topmost H1, or at the top below YAML frontmatter if there is no H1). Re-running rewrites the existing TOC rather than stacking a new one. This is separate from the website build.
+### 3.1. `[toc-builder]` section
 
 - `max_depth`: deepest heading level to list. Defaults to 6.
 - `slug_style`: anchor scheme. `"site"` (default) matches the slugs the website builder generates, so links work on the built site. `"github"` matches GitHub's raw `.md` rendering instead. They differ mainly on duplicate headings (`_1` vs `-1`).
 - `toc_title`: heading text for the generated TOC. Defaults to "Table of Contents".
+
+## 4. Keys for heading numbering
+
+### 4.1. `[exclude-headings]` section
+
+- `titles`: a list of heading texts (matched without any manual number) to leave out of the numbering. An excluded heading keeps its text as-is and does not consume a counter, so its siblings number as if it were not there. The CLI `--exclude` flag overrides this list when given.

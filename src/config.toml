@@ -36,3 +36,7 @@ nav = "none"
 # max_depth = 6              # deepest heading level to list
 # slug_style = "site"        # "site" (matches the website build) | "github"
 # toc_title = "Table of Contents"
+
+# Headings to leave out of numbering (headings.py). Matched by text.
+# [exclude-headings]
+# titles = ["Preface", "Appendix"]

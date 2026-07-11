@@ -132,4 +132,4 @@ Run from your repo root:
 python .tools/headings.py path/to/file  # or: md-tools headings path/to/file
 ```
 
-It rewrites a single file in place, prepending nested numbers (`1.`, `1.1.`) to its headings. Any existing manual numbers are stripped first, so a re-run reproduces the same output instead of doubling. Numbering anchors at H2 by default; pass `--number-h1` to include H1. This is the same logic `merge.py` uses for its `--number` option.
+It rewrites a single file in place, prepending nested numbers (`1.`, `1.1.`) to its headings. Any existing manual numbers are stripped first, so a re-run reproduces the same output instead of doubling. Numbering anchors at H2 by default; pass `--number-h1` to include H1. Headings can be left out of the numbering by their text: pass `--exclude "Some Heading"` (repeatable) on the CLI, or list them under `[exclude-headings]` in the config (see the [configuration docs](docs/config.md)). An excluded heading is skipped entirely and does not consume a counter. This is the same logic `merge.py` uses for its `--number` option.

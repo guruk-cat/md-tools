@@ -12,12 +12,21 @@ alone); --number-h1 includes H1 in the hierarchy.
 
 import argparse
 import re
+import tomllib
 from pathlib import Path
 
 FENCE_RE = re.compile(r"^\s*(```+|~~~+)")
 ATX_RE = re.compile(r"^ {0,3}(#{1,6})(?=[ \t]|$)(.*)$")
 TOC_OPEN = "<!-- toc -->"
 TOC_CLOSE = "<!-- /toc -->"
+CONFIG = Path.cwd() / ".tools" / "config.toml"
+
+
+def load_exclude():
+    if not CONFIG.exists():
+        return []
+    with CONFIG.open("rb") as f:
+        return tomllib.load(f).get("exclude-headings", {}).get("titles", [])
 
 
 def clamp(n, lo, hi):
@@ -71,10 +80,11 @@ def advance_counters(counters, depth):
     return ".".join(map(str, counters)) + "."
 
 
-def number_headings(doc, renumber, number_h1):
+def number_headings(doc, renumber, number_h1, exclude=()):
     if not renumber:
         return doc
     base = 1 if number_h1 else 2
+    exclude = set(exclude)
     out, fence, in_toc, counters = [], None, False, []
     for line in doc.split("\n"):
         fm = FENCE_RE.match(line)
@@ -98,7 +108,7 @@ def number_headings(doc, renumber, number_h1):
             out.append(line)
             continue
         parsed = parse_heading(line)
-        if parsed and parsed[0] >= base:
+        if parsed and parsed[0] >= base and parsed[1] not in exclude:
             level, text = parsed
             num = advance_counters(counters, level - base)
             out.append("#" * level + " " + num + " " + text)
@@ -117,14 +127,20 @@ def run(argv):
     p = argparse.ArgumentParser(description="Number a file's headings in place.")
     p.add_argument("file")
     p.add_argument("--number-h1", dest="number_h1", action="store_true")
+    p.add_argument("--exclude", action="append", default=None,
+                   help="heading text to leave unnumbered; repeatable. "
+                        "Overrides [exclude-headings] titles in config.")
     args = p.parse_args(argv)
 
     path = Path(args.file)
     if not path.is_file():
         raise SystemExit(f"not a file: {args.file}")
 
+    exclude = args.exclude if args.exclude is not None else load_exclude()
     original = path.read_text(encoding="utf-8")
-    result = number_headings(original, renumber=True, number_h1=args.number_h1)
+    result = number_headings(
+        original, renumber=True, number_h1=args.number_h1, exclude=exclude
+    )
     if result == original:
         print(f"headings: no change ({path})")
         return
@@ -158,6 +174,13 @@ def selfcheck():
     assert number_headings(withtoc, renumber=True, number_h1=False) == (
         "<!-- toc -->\n## Table of Contents\n- [A](#a)\n<!-- /toc -->\n\n## 1. A"
     )
+
+    # Excluded heading is ignored: not numbered, consumes no counter
+    doc = number_headings(
+        "## A\n\n## Skip\n\n## B", renumber=True, number_h1=False,
+        exclude=["Skip"],
+    )
+    assert doc == "## 1. A\n\n## Skip\n\n## 2. B"
 
     print("selfcheck ok")
 
