@@ -1,19 +1,19 @@
 :root {
   --fg: #292a25;
-  --bg: #ece2c7;
+  --bg: #e0d8be;
   --muted: #6f6a5d;
   --accent: #1f6f8b;
-  --border: #ddd6c4;
+  --border: #d2caad;
   --code-bg: #efe9d8;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --fg: #d6d3c9;
-    --bg: #20242b;
+    --bg: #2d2d2d;
     --muted: #8f8d85;
     --accent: #7fb4c4;
-    --border: #353a43;
+    --border: #4a4a4a;
     --code-bg: #2a2f37;
   }
 }
@@ -27,7 +27,7 @@ body {
   margin: 0;
   color: var(--fg);
   background: var(--bg);
-  font-family: ui-monospace, Menlo, Consolas, "Roboto Mono", sans-serif;
+  font-family: sans-serif;
   line-height: 1.6;
   /* 
     Column flex + min-height so a short page still pushes the footer to the
@@ -149,9 +149,16 @@ footer {
   font-size: 0.85rem;
 }
 
-h1, h2, h3, h4 {
+h1 {
   line-height: 1.25;
   margin-top: 2rem;
+  font-family: Georgia, 'Times New Roman', Times, serif;
+}
+
+h2, h3, h4, h5 {
+  line-height: 1.25;
+  margin-top: 2rem;
+  font-family: sans-serif
 }
 
 a {
