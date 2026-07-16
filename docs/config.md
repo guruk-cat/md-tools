@@ -23,14 +23,12 @@ Used to configure layout options.
 
 Renders a static bar of outbound links at the top of a page, aligned with the body text. The bar sits in normal document flow rather than being pinned, so it scrolls away as the visitor reads. It is independent of the sidebar.
 
-- `show`: which pages carry the bar. One of `"disabled"`, `"home"`, or `"not home"`. Defaults to `"disabled"` (also the effect when the section is absent). Any other value fails the build.
+- `show`: which pages carry the bar. Defaults to `"disabled"` (also the effect when the section is absent). 
+    - `"disabled"`: the bar is never rendered.
+    - `"all"`: the bar renders on all pages
+    - `"home"`: the bar renders on the homepage (the repo-level README) only.
+    - `"not home"`: the bar renders on every page except the homepage.
 - `[[header.link]]`: one entry per link, each with a `name` and a `url`. A link missing either key fails the build.
-
-The `show` modes are:
-
-- `"disabled"`: the bar is never rendered.
-- `"home"`: the bar renders on the homepage (the repo-level README) only.
-- `"not home"`: the bar renders on every page except the homepage.
 
 If `show` is enabled but no links are given, no bar is rendered.
 

@@ -104,12 +104,12 @@ def build_footer(cfg):
     return "<footer>" + "".join(lines) + "</footer>"
 
 
-HEADER_MODES = ("disabled", "home", "not home")
+HEADER_MODES = ("disabled", "home", "not home", "all")
 
 
 def build_masthead(cfg):
     # (mode, html): mode decides which pages carry the bar 
-    # ("home" | "not home" | "disabled")
+    # ("home" | "not home" | "all" | "disabled")
     h = cfg.get("header")
     if not h:
         return ("disabled", "")
@@ -292,7 +292,8 @@ def build():
                 out.relative_to(OUTPUT),
             )
             show_masthead = masthead_html and (
-                (header_mode == "home" and is_readme)
+                header_mode == "all"
+                or (header_mode == "home" and is_readme)
                 or (header_mode == "not home" and not is_readme)
             )
             if show_masthead:
