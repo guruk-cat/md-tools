@@ -30,13 +30,20 @@ TEMPLATE_MARKERS = ("{{title}}", "{{nav}}", "{{content}}", "{{footer}}")
 
 EXTENSIONS = ["meta", "toc", "footnotes", "tables", "fenced_code"]
 
-NAV_MODES = ("none", "browse", "readme")
+SIDEBAR_MODES = ("none", "browse", "readme", "toc")
 
 # Rewrite href="...md" / href="...md#anchor" on rendered HTML.
 # Matching the href attribute (not raw markdown) skips code blocks and covers reference links automatically.
 LINK_RE = re.compile(r"""(href=["'])([^"']*\.md)((?:#[^"']*)?["'])""")
 H1_RE = re.compile(r"<h1[^>]*>(.*?)</h1>", re.DOTALL)
 TAG_RE = re.compile(r"<[^>]+>")
+
+# Markers and item shape that toc.py writes; 'toc' mode reads the block back out.
+TOC_OPEN = "<!-- toc -->"
+TOC_CLOSE = "<!-- /toc -->"
+TOC_ITEM_RE = re.compile(r"^(\s*)- \[(.+)\]\(#(.+)\)\s*$")
+TOC_TITLE_RE = re.compile(r"^##\s+(.*?)\s*#*\s*$")
+TOC_INDENT = 4  # toc.py indents one nesting level per 4 spaces
 
 
 def make_md():
@@ -85,6 +92,11 @@ def load_config():
         return tomllib.load(f)
 
 
+def inline_md(text):
+    # markdown.markdown wraps output in <p>; strip it for text used inline.
+    return markdown.markdown(str(text)).removeprefix("<p>").removesuffix("</p>")
+
+
 def build_footer(cfg):
     # Footer HTML from [footer] lines, or "" if no [footer] section is configured.
     # Each [[footer.line]] carries `text` rendered as markdown
@@ -96,9 +108,7 @@ def build_footer(cfg):
         text = line.get("text")
         if not text:
             raise SystemExit("[[footer.line]] entries each need a 'text'")
-        # markdown.markdown wraps output in <p>; strip it since each line is inline.
-        html = markdown.markdown(str(text)).removeprefix("<p>").removesuffix("</p>")
-        lines.append(f"<div>{html}</div>")
+        lines.append(f"<div>{inline_md(text)}</div>")
     if not lines:
         return ""
     return "<footer>" + "".join(lines) + "</footer>"
@@ -158,6 +168,74 @@ def home_link(title):
     return f'<ul class="nav-home"><li><a href="/index.html">{htmllib.escape(title)}</a></li></ul>'
 
 
+def parse_toc_block(text, source):
+    # Pull toc.py's block out of the markdown source: 'toc' mode shows it in the
+    # sidebar instead of the body, so it must not render twice.
+    # Returns (text_without_block, title, [(level, label, sid)]); no block -> unchanged text.
+    lines = text.split("\n")
+    start = next((i for i, ln in enumerate(lines) if ln.strip() == TOC_OPEN), None)
+    if start is None:
+        return text, "", []
+    end = next((j for j in range(start + 1, len(lines)) if lines[j].strip() == TOC_CLOSE), None)
+    if end is None:
+        raise SystemExit(
+            f"{source}: unterminated TOC block: found '{TOC_OPEN}' with no matching "
+            f"'{TOC_CLOSE}'. Fix the markers; refusing to build."
+        )
+    title, items = "", []
+    for line in lines[start + 1:end]:
+        m = TOC_ITEM_RE.match(line)
+        if m:
+            items.append((len(m.group(1)) // TOC_INDENT, m.group(2), m.group(3)))
+            continue
+        t = TOC_TITLE_RE.match(line)
+        if t and not title:
+            title = t.group(1)
+    return "\n".join(lines[:start] + lines[end + 1:]), title, items
+
+
+def toc_tree(items):
+    # Flat (level, label, sid) list -> nested nodes. A level that skips a rung
+    # (H2 straight to H4) just nests one level; the TOC is for navigating, not
+    # for reproducing the heading arithmetic.
+    root = []
+    stack = [(-1, root)]
+    for level, label, sid in items:
+        node = {"label": label, "sid": sid, "kids": []}
+        while stack[-1][0] >= level:
+            stack.pop()
+        stack[-1][1].append(node)
+        stack.append((level, node["kids"]))
+    return root
+
+
+def render_toc_nodes(nodes, top):
+    # Only first-level sections fold; everything under one renders with it.
+    lines = ["<ul>"]
+    for n in nodes:
+        link = f'<a href="#{htmllib.escape(n["sid"])}">{inline_md(n["label"])}</a>'
+        if top and n["kids"]:
+            lines.append(f"<li><details><summary>{link}</summary>")
+            lines.extend(render_toc_nodes(n["kids"], False))
+            lines.append("</details></li>")
+        else:
+            lines.append(f"<li>{link}")
+            if n["kids"]:
+                lines.extend(render_toc_nodes(n["kids"], False))
+            lines.append("</li>")
+    lines.append("</ul>")
+    return lines
+
+
+def build_toc_nav(title, items):
+    # "" when the page carries no TOC: that page simply gets no sidebar.
+    if not items:
+        return ""
+    head = [f'<div class="toc-title">{htmllib.escape(title)}</div>'] if title else []
+    body = render_toc_nodes(toc_tree(items), True)
+    return "\n".join(['<nav class="sidebar toc">', *head, *body, "</nav>"])
+
+
 def nav_tree(pages):
     # tree node: {"files": [(title, out)], "dirs": {name: node}}
     tree = {"files": [], "dirs": {}}
@@ -169,9 +247,8 @@ def nav_tree(pages):
     return tree
 
 
-def render_tree(node, path):
-    # Collapsible tree of a node's files and subfolders. `path` seeds the
-    # data-path keys, so a scoped tree's fold-state stays namespaced to its section.
+def render_tree(node):
+    # Collapsible tree of a node's files and subfolders.
     lines = []
     files = sorted(node["files"], key=lambda t: t[0].lower())
     if files:
@@ -181,10 +258,9 @@ def render_tree(node, path):
             lines.append(f'<li><a href="{href}">{htmllib.escape(title)}</a></li>')
         lines.append("</ul>")
     for name in sorted(node["dirs"]):
-        sub = f"{path}/{name}" if path else name
-        lines.append(f'<details data-path="{htmllib.escape(sub)}">')
+        lines.append("<details>")
         lines.append(f"<summary>{htmllib.escape(name)}</summary>")
-        lines.extend(render_tree(node["dirs"][name], sub))
+        lines.extend(render_tree(node["dirs"][name]))
         lines.append("</details>")
     return lines
 
@@ -195,7 +271,7 @@ def wrap_nav(lines):
 
 def build_browse_nav(pages):
     # One shared sidebar: the whole site as a collapsible tree.
-    return wrap_nav(render_tree(nav_tree(pages), ""))
+    return wrap_nav(render_tree(nav_tree(pages)))
 
 
 def build_readme_navs(pages):
@@ -237,10 +313,10 @@ def build_readme_navs(pages):
             siblings = {"files": [f for f in node["files"] if f[1] != readme_out],
                         "dirs": node["dirs"]}
             link = f'<a href="/{out.as_posix()}">{htmllib.escape(title)}</a>'
-            section = [f"<ul><li>{link}", *render_tree(siblings, name), "</li></ul>"]
+            section = [f"<ul><li>{link}", *render_tree(siblings), "</li></ul>"]
             section_items.append(f"<li>{link}</li>")
         else:
-            section = render_tree(node, name)
+            section = render_tree(node)
         scoped[name] = wrap_nav([home_link(home_title), *section])
 
     if section_items:
@@ -250,9 +326,9 @@ def build_readme_navs(pages):
 
 def build():
     cfg = load_config()
-    nav = cfg.get("site-layout", {}).get("nav", "none")
-    if nav not in NAV_MODES:
-        raise SystemExit(f"[site-layout] nav must be one of {', '.join(NAV_MODES)}; got {nav!r}")
+    sidebar = cfg.get("sidebar", {}).get("mode", "none")
+    if sidebar not in SIDEBAR_MODES:
+        raise SystemExit(f"[sidebar] mode must be one of {', '.join(SIDEBAR_MODES)}; got {sidebar!r}")
     home = cfg.get("site-layout", {}).get("home")
     footer_html = build_footer(cfg)
     header_mode, masthead_html = build_masthead(cfg)
@@ -273,7 +349,7 @@ def build():
     md = make_md()
 
     # Render every page and collect (output path, title) before writing
-    rendered = []  # (out_path, title, body)
+    rendered = []  # (out_path, title, body, toc_nav)
     for path in ROOT.rglob("*"):
         # Skip dot-dirs (.tools, .public, .git, ...)
         if any(part.startswith(".") for part in path.relative_to(ROOT).parts):
@@ -287,10 +363,12 @@ def build():
             is_readme = rel == Path("README.md")
             if is_readme:
                 out = OUTPUT / "index.html"
-            body = rewrite_links(
-                render(md, path.read_text(encoding="utf-8")),
-                out.relative_to(OUTPUT),
-            )
+            text = path.read_text(encoding="utf-8")
+            toc_nav = ""
+            if sidebar == "toc":
+                text, toc_title, toc_items = parse_toc_block(text, rel)
+                toc_nav = build_toc_nav(toc_title, toc_items)
+            body = rewrite_links(render(md, text), out.relative_to(OUTPUT))
             show_masthead = masthead_html and (
                 header_mode == "all"
                 or (header_mode == "home" and is_readme)
@@ -299,25 +377,29 @@ def build():
             if show_masthead:
                 body = masthead_html + body   # atop the content column
             title = pick_title(md.Meta, body, path.stem, home if is_readme else None)
-            rendered.append((out, title, body))
+            rendered.append((out, title, body, toc_nav))
         else:
             # Non-md asset: copy through, preserving structure.
             asset_out = OUTPUT / rel
             asset_out.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, asset_out)
 
-    pages = [(out.relative_to(OUTPUT), title) for out, title, _ in rendered]
+    pages = [(out.relative_to(OUTPUT), title) for out, title, _, _ in rendered]
     global_nav, scoped = "", {}
-    if nav == "browse":
+    if sidebar == "browse":
         global_nav = build_browse_nav(pages)
-    elif nav == "readme":
+    elif sidebar == "readme":
         global_nav, scoped = build_readme_navs(pages)
 
-    # Write pages, each with its nav injected. In 'readme' mode a page inside a
-    # top-level directory gets that section's scoped nav; anything else (root pages,
-    # and every page in 'browse'/'none') gets global_nav.
-    for out, title, body in rendered:
-        nav_html = scoped.get(out.relative_to(OUTPUT).parts[0], global_nav)
+    # Write pages, each with its sidebar injected. 'toc' mode is per-page (built
+    # above, "" where a page has no TOC). In 'readme' mode a page inside a top-level
+    # directory gets that section's scoped nav; anything else (root pages, and every
+    # page in 'browse'/'none') gets global_nav.
+    for out, title, body, toc_nav in rendered:
+        if sidebar == "toc":
+            nav_html = toc_nav
+        else:
+            nav_html = scoped.get(out.relative_to(OUTPUT).parts[0], global_nav)
         page = (
             template.replace("{{title}}", htmllib.escape(title))
             .replace("{{nav}}", nav_html)
@@ -329,10 +411,53 @@ def build():
 
     shutil.copy2(STYLE, OUTPUT / "style.css")
     shutil.copy2(ROBOTS, OUTPUT / "robots.txt")
-    print(f"built -> {OUTPUT}" + (f" (nav: {nav})" if nav != "none" else ""))
+    print(f"built -> {OUTPUT}" + (f" (sidebar: {sidebar})" if sidebar != "none" else ""))
 
 
+def selfcheck():
+    doc = (
+        "# Title\n\n"
+        "<!-- toc -->\n## Table of Contents\n"
+        "- [1. Intro](#1-intro)\n"
+        "    - [1.1. The `code` bit](#11-the-code-bit)\n"
+        "- [2. Flat](#2-flat)\n"
+        "<!-- /toc -->\n\n"
+        "## 1. Intro\n"
+    )
+    body, title, items = parse_toc_block(doc, "t.md")
+    assert TOC_OPEN not in body and "1. Intro](#" not in body  # block left the body
+    assert "# Title" in body and "## 1. Intro" in body         # rest of the page survived
+    assert title == "Table of Contents"
+    assert items == [(0, "1. Intro", "1-intro"),
+                     (1, "1.1. The `code` bit", "11-the-code-bit"),
+                     (0, "2. Flat", "2-flat")]
+
+    nav = build_toc_nav(title, items)
+    assert "<details><summary>" in nav          # section with children folds
+    assert "<code>code</code>" in nav           # inline markdown in a heading renders
+    assert nav.count("<details>") == 1          # childless section stays a plain link
+    assert "open" not in nav                    # folded by default
+
+    # A page with no TOC gets no sidebar at all, and its body is untouched.
+    plain = "# Just a page\n\n## A\n"
+    b, t, i = parse_toc_block(plain, "p.md")
+    assert (b, t, i) == (plain, "", [])
+    assert build_toc_nav(t, i) == ""
+
+    # Unterminated block must refuse rather than swallow the page.
+    try:
+        parse_toc_block("# T\n\n<!-- toc -->\n- [A](#a)\n\n## Body\n", "b.md")
+    except SystemExit:
+        pass
+    else:
+        assert False, "unterminated TOC block should refuse to build"
+    print("selfcheck ok")
 
 
 if __name__ == "__main__":
-    build()
+    import sys
+
+    if "--selfcheck" in sys.argv:
+        selfcheck()
+    else:
+        build()

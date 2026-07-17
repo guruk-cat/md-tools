@@ -73,7 +73,7 @@ Run from your repo root:
 python .tools/build.py        # or, with the PATH command: md-tools build
 ```
 
-Site preferences (sidebar nav, header, footer) live in `.tools/config.toml`; see the [configuration docs](docs/config.md). If `template.html` is missing or is an older version that lacks a required placeholder, the build refuses to run and tells you to re-scaffold it.
+Site preferences (sidebar, header, footer) live in `.tools/config.toml`; see the [configuration docs](docs/config.md). If `template.html` is missing or is an older version that lacks a required placeholder, the build refuses to run and tells you to re-scaffold it.
 
 ### 3.2. Serving locally
 
@@ -113,6 +113,8 @@ python .tools/toc.py path/to/file       # or: md-tools toc path/to/file
 ```
 
 It will generate a table of contents and append it beneath the H1 heading, if present. If no H1 heading is present, the table will be appended above the text and below the metadata block (if present). For config options, see [configuration docs](docs/config.md).
+
+The block it writes is also what the website builder's `"toc"` sidebar mode reads, so running this over your pages is what populates their sidebars.
 
 ## 6. Footnote Arranger
 

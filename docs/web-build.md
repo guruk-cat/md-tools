@@ -10,6 +10,8 @@ Internal links are rewritten on the rendered HTML (the `href` attribute) rather 
 
 Page titles, used for the `<title>` tag and for nav link text, resolve in priority order: the frontmatter `title` field, then the first `# H1` heading, then the filename.
 
+Under the `"toc"` sidebar mode, a page's TOC block (the `<!-- toc -->` markers written by `toc.py`) is lifted out of the markdown before rendering and becomes that page's sidebar, so it does not also render in the body. This is the one case where the built body departs from the source; see the [configuration docs](config.md) for the mode itself.
+
 Footnotes stay isolated per page. The build resets the markdown parser before each file, since the `footnotes` extension would otherwise leak definitions from one file into the next.
 
 Non-markdown files such as images are copied through to `.public/`, preserving their structure.

@@ -1,13 +1,16 @@
 # Site configuration. Edit and re-run the build; setup.py won't overwrite this.
 
-[site-layout]
-# Sidebar navigation mode:
+[sidebar]
+# What goes in the left gutter:
 #   "none"   - no sidebar.
 #   "browse" - one sidebar for the whole site, as a collapsible folder tree.
 #   "readme" - global sidebar links to each top-level directory's README; opening
 #              one shows that directory's own tree (scoped), with a Home link back.
-nav = "none"
+#   "toc"    - each page's own table of contents (the block toc.py writes), moved
+#              out of the body into the sidebar. Pages without a TOC get no sidebar.
+mode = "none"
 
+[site-layout]
 # Override the homepage (README) title. Uncomment to use.
 # home = "Home"
 

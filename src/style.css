@@ -97,6 +97,24 @@ footer {
   padding-left: 0.75rem;
 }
 
+/*
+  'toc' mode: summaries are the page's own headings, so they read as links
+  rather than the folder labels 'browse'/'readme' put in a summary. */
+.sidebar.toc summary {
+  margin: 0.2rem 0;
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.sidebar .toc-title {
+  margin-bottom: 0.75rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
 /* 'readme' mode: set the Home link apart from the section below it. */
 .sidebar .nav-home {
   margin-bottom: 0.75rem;

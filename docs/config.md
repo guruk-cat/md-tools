@@ -6,20 +6,34 @@ The setup script (`setup.py`) includes a scaffoleded `config.toml` in the `.tool
 
 ## 2. Keys for the website builder
 
-### 2.1. `[site-layout]` section
+### 2.1. `[sidebar]` section
 
-Used to configure layout options.
+Controls what the build puts in the left gutter.
 
-- `nav`: sidebar navigation mode. One of `"none"`, `"browse"`, or `"readme"`. Defaults to `"none"`. Any other value fails the build. See section 2.1.1 below.
-- `home = str` : override the homepage (README) title.
+- `mode`: one of `"none"`, `"browse"`, `"readme"`, or `"toc"`. Defaults to `"none"`. Any other value fails the build. See section 2.1.1 below.
 
-#### 2.1.1. `nav` modes
+#### 2.1.1. `mode` values
 
 - `"none"`: no sidebar is rendered.
-- `"browse"`: a single sidebar, shared by every page, presenting the whole site as a collapsible tree that mirrors the folder structure. Files are listed alphabetically by title; folders are collapsible and remember their open/closed state across page loads.
+- `"browse"`: a single sidebar, shared by every page, presenting the whole site as a collapsible tree that mirrors the folder structure. Files are listed alphabetically by title. Folders are collapsible, and the folders containing the current page are opened on load; everything else starts closed.
 - `"readme"`: the sidebar is scoped rather than global. Root-level pages (the homepage and any markdown file next to the root README) show a global sidebar: those root pages at the top, followed by one link per top-level directory that contains its own `README.md`. Each such link points at that directory's README and is labeled by its title (frontmatter `title`, then first H1, then filename). Directories without a README are omitted. Opening a directory's README (or any page inside that directory) swaps the sidebar for a `browse`-style tree scoped to that directory alone, topped with a Home link back to the site root. A README nested deeper than a top-level directory gets no special treatment; it appears as an ordinary file within its parent directory's scoped tree.
+- `"toc"`: the sidebar is the page's own table of contents rather than a map of the site. See section 2.1.2 below.
 
-### 2.2. `[header]` section
+#### 2.1.2. The `"toc"` mode
+
+The build reads the block that `toc.py` writes (the `<!-- toc -->` ... `<!-- /toc -->` markers) and renders it into the sidebar. The block is taken out of the page body, so the contents appear once on the built page rather than twice. Your source `.md` file is not touched, so the TOC still renders inline when the file is read on GitHub or in an editor.
+
+Presentation follows Wikipedia's sidebar. First-level sections are foldable and start folded, so a long document shows a scannable list of its top-level sections on load. Everything nested beneath a first-level section appears when that section is expanded. Clicking a section both jumps to it and unfolds it.
+
+Which heading level counts as "first-level" is whatever `toc.py` put at the top of the block (H2 in a typical document with a single H1 title). The sidebar does not re-derive this; it reflects the nesting of the block as generated, including the `max_depth` cap from `[toc-builder]`.
+
+A page whose markdown carries no TOC block gets no sidebar, and its content is centered exactly as it would be under `mode = "none"`. A page with an opening marker but no closing one fails the build rather than being rendered with a truncated body.
+
+### 2.2. `[site-layout]` section
+
+- `home = str` : override the homepage (README) title. It is used for the `<title>` tag and, in `"readme"` sidebar mode, for the homepage's pinned entry and the Home link.
+
+### 2.3. `[header]` section
 
 Renders a static bar of outbound links at the top of a page, aligned with the body text. The bar sits in normal document flow rather than being pinned, so it scrolls away as the visitor reads. It is independent of the sidebar.
 
@@ -32,7 +46,7 @@ Renders a static bar of outbound links at the top of a page, aligned with the bo
 
 If `show` is enabled but no links are given, no bar is rendered.
 
-### 2.3. `[footer]` section
+### 2.4. `[footer]` section
 
 A footer is generated on every page if the section is present. It holds one or more lines.
 
