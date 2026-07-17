@@ -35,7 +35,9 @@ A page whose markdown carries no TOC block gets no sidebar, and its content is c
 
 ### 2.3. `[header]` section
 
-Renders a static bar of links across the top of a page, above both the sidebar and the body. The bar sits in normal document flow rather than being pinned, so it scrolls away as the visitor reads. Where a sidebar is present, the sidebar rides down with the header and then sticks to the top of the viewport once the header has scrolled out of view.
+Renders a static bar of links across the top of a page, above both the sidebar and the body. The header, the sidebar, and the body all sit inside one centered container, so the three share the same left and right edges.
+
+The bar sits in normal document flow rather than being pinned, so it scrolls away as the visitor reads. Where a sidebar is present, the sidebar rides down with the header and then sticks to the top of the viewport once the header has scrolled out of view.
 
 - `show`: which pages carry the bar. Defaults to `"disabled"` (also the effect when the section is absent). 
     - `"disabled"`: the bar is never rendered.
@@ -45,7 +47,7 @@ Renders a static bar of links across the top of a page, above both the sidebar a
 - `[header.homelink]`: optional, at most one. Takes only a `name`; the build points it at the site root, so no `url` is given. A homelink without a `name` fails the build.
 - `[[header.link]]`: one entry per link, each with a `name` and a `url`. A link missing either key fails the build.
 
-The homelink decides how the bar is laid out. With one, the bar spans the full window: the homelink is pinned to the left and the `[[header.link]]` entries sit to the right. Without one, there is nothing to anchor the left edge, so the bar lines up with the body text instead (matching the text column's own alignment, sidebar or not).
+With a homelink, it is pinned to the left of the bar and the `[[header.link]]` entries sit to the right. Without one, the links start on the left instead.
 
 If `show` is enabled but neither a homelink nor any links are given, no bar is rendered. A homelink on its own is enough to render one.
 

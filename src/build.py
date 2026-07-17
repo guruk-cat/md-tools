@@ -34,6 +34,9 @@ SIDEBAR_MODES = ("none", "browse", "readme", "toc")
 
 # Rewrite href="...md" / href="...md#anchor" on rendered HTML.
 # Matching the href attribute (not raw markdown) skips code blocks and covers reference links automatically.
+# Markers that turn a line into a block (list, heading, quote) when it leads one.
+LEADING_BLOCK_RE = re.compile(r"^\s*([#>]+|\d+[.)]|[-+*])(?=\s|$)")
+
 LINK_RE = re.compile(r"""(href=["'])([^"']*\.md)((?:#[^"']*)?["'])""")
 H1_RE = re.compile(r"<h1[^>]*>(.*?)</h1>", re.DOTALL)
 TAG_RE = re.compile(r"<[^>]+>")
@@ -92,9 +95,21 @@ def load_config():
         return tomllib.load(f)
 
 
+def escape_leading(m):
+    # A numeric marker needs the backslash on its punctuation ("1\."), the rest
+    # on the character itself ("\-").
+    tok = m.group(1)
+    if tok[0].isdigit():
+        return m.group(0).replace(tok, tok[:-1] + "\\" + tok[-1])
+    return m.group(0).replace(tok, "\\" + tok[0] + tok[1:])
+
+
 def inline_md(text):
-    # markdown.markdown wraps output in <p>; strip it for text used inline.
-    return markdown.markdown(str(text)).removeprefix("<p>").removesuffix("</p>")
+    # markdown.markdown parses its argument as a block, so a heading numbered
+    # "1." arrives as an <ol>, not text. Escaping a leading block marker keeps it
+    # literal; inline markup (links, `code`) still renders.
+    text = LEADING_BLOCK_RE.sub(escape_leading, str(text))
+    return markdown.markdown(text).removeprefix("<p>").removesuffix("</p>")
 
 
 def build_footer(cfg):
@@ -144,9 +159,7 @@ def build_masthead(cfg):
 
     links = f'<nav class="links">{"".join(items)}</nav>' if items else ""
     if home is None:
-        # No homelink means nothing to pin left, so the bar lines up with the
-        # text column instead of spanning it (see .masthead.aligned in style.css).
-        return (mode, f'<header class="masthead aligned">{links}</header>')
+        return (mode, f'<header class="masthead">{links}</header>')
     name = htmllib.escape(str(home["name"]))
     return (mode, f'<header class="masthead"><a href="/index.html">{name}</a>{links}</header>')
 
@@ -464,15 +477,14 @@ def selfcheck():
         assert False, "unterminated TOC block should refuse to build"
 
     link = {"name": "Blog", "url": "https://b.me"}
-    # No homelink: the bar carries the class that lines it up with the text column.
+    # No homelink: a bar of links only, nothing pointing at the site root.
     _, bar = build_masthead({"header": {"show": "all", "link": [link]}})
-    assert 'class="masthead aligned"' in bar
+    assert "Blog" in bar
     assert "/index.html" not in bar
 
-    # Homelink: full-width bar, home pinned left, and it points at the site root.
+    # Homelink: pinned left of the links, pointing at the site root.
     _, bar = build_masthead({"header": {"show": "all", "link": [link],
                                         "homelink": {"name": "My Notes"}}})
-    assert 'class="masthead"' in bar
     assert bar.index('href="/index.html"') < bar.index("Blog")
 
     # A homelink alone is still a bar; nothing configured at all is not.

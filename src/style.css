@@ -29,51 +29,52 @@ body {
   background: var(--bg);
   font-family: sans-serif;
   line-height: 1.6;
-  /*
-    Column flex + min-height so a short page still pushes the footer to the
-    bottom of the viewport (the header, then .layout which grows). */
   display: flex;
   flex-direction: column;
   min-height: 100vh;
 }
 
-/* The header/sidebar/content rows. .layout grows so short pages still fill the
-   viewport, and it is the sidebar's sticky containing block. */
+/* The container header, sidebar and body all align to. */
+.page {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  box-sizing: border-box;
+}
+
+/* Sidebar + content row. Grows so short pages still push the footer down. */
 .layout {
   flex: 1 0 auto;
   display: flex;
 }
 
-/* main + footer share one column so the footer tracks main's alignment. */
+/* The text column's width and alignment live here, so main and footer can only
+   ever share an edge. Centered on its own; flush to the sidebar when there is one. */
 .column {
   flex: 1 1 auto;
   min-width: 0;
+  max-width: 46rem;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
 }
 
 main {
   flex: 1 0 auto;
-  max-width: 46rem;
-  margin: 0 auto;
-  padding: 2.5rem 1.25rem 6rem;
+  padding: 2.5rem 0 6rem;
 }
 
 footer {
-  max-width: 46rem;
-  margin: 0 auto;
-  padding: 1.5rem 1.25rem;
+  padding: 1.5rem 0;
   font-size: 0.85rem;
   color: var(--muted);
 }
 
-/*
-  Sidebar exists only when a sidebar mode is enabled in config. Sticky, not fixed:
-  it sits below the header in normal flow and rides down with it, then pins to the
-  top once the header has scrolled away. align-self keeps it its own height rather
-  than stretching, which is what lets sticky engage.
-  Below the breakpoint the gutter can't hold it without overlapping text, so the
-  media query drops it to static (stacked on top). */
+/* Rides down with the header, then pins. align-self is what lets sticky engage. */
 .sidebar {
   position: sticky;
   top: 0;
@@ -82,7 +83,7 @@ footer {
   width: 15rem;
   max-height: 100vh;
   overflow-y: auto;
-  padding: 1.5rem 1rem;
+  padding: 2.5rem 1.5rem 1.5rem 0;
   font-size: 0.9rem;
   box-sizing: border-box;
 }
@@ -149,25 +150,11 @@ footer {
   margin: 0.2rem 0;
 }
 
-/*
-  Keep the text column centered in the viewport rather than in the space left
-  over beside the sidebar, while never letting it slide under the nav. The
-  sidebar now occupies a real 15rem of the row, so the column's own margin has
-  to subtract that back out to land on the viewport's centre line: the offset
-  puts .column's left edge at max(16rem, (100% - 46rem) / 2) from the window.
-  The centered term wins above 78rem; the 1rem floor (= 16rem from the window)
-  wins below it. main and footer then sit flush against .column's left edge
-  instead of centering again inside it. */
 .sidebar ~ .column {
-  margin-left: max(1rem, (100% - 46rem) / 2 - 15rem);
-}
-
-.sidebar ~ .column main,
-.sidebar ~ .column footer {
   margin-left: 0;
 }
 
-/* Below this, nav + main no longer fit side by side, so stack the nav on top */
+/* Below this, sidebar + main no longer fit side by side, so stack. */
 @media (max-width: 64rem) {
   .layout {
     flex-direction: column;
@@ -177,35 +164,22 @@ footer {
     align-self: auto;
     width: auto;
     max-height: none;
+    padding: 1rem 0;
     border-bottom: 1px solid var(--border);
   }
   .sidebar ~ .column {
-    margin-left: 0;
-  }
-  .sidebar ~ .column main,
-  .sidebar ~ .column footer {
-    margin-left: auto;
-  }
-  .masthead.aligned {
     margin-left: auto;
   }
 }
 
-/*
-  Outbound-link bar. A real header: full width, in normal flow so it scrolls
-  away (the sidebar is sticky, so it pins once this clears the top). With a
-  homelink the bar spans the window, home pinned left and the rest right. */
+/* Outbound-link bar. In normal flow, so it scrolls away and the sidebar pins. */
 .masthead {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 1.25rem;
-  /* Gutter is the bar's own, not main's: it spans the window, so it needs more
-     inset than a 46rem text column does. The bottom margin keeps the sidebar
-     off it at scroll top. */
-  padding: 1.5rem 2rem;
-  margin-bottom: 1rem;
+  padding: 1.25rem 0;
   font-size: 0.85rem;
 }
 
@@ -215,20 +189,9 @@ footer {
   gap: 1.25rem;
 }
 
-/*
-  No homelink: nothing needs pinning to the left edge, so the bar lines up with
-  the text column. The margin mirrors main's own left edge (see .sidebar ~ .column),
-  measured here against the body rather than .layout. */
-.masthead.aligned {
-  max-width: 46rem;
-  margin: 0 auto 1rem;
-  /* Back to main's gutter, so the links land on the body text's own left edge. */
-  padding-left: 1.25rem;
-  padding-right: 1.25rem;
-}
-
-body:has(.sidebar) .masthead.aligned {
-  margin-left: max(16rem, (100% - 46rem) / 2);
+/* Dropping it on the first one starts the body text on the sidebar's first line. */
+main > :first-child {
+  margin-top: 0;
 }
 
 h1 {
