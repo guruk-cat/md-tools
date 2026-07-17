@@ -251,6 +251,10 @@ img {
   height: auto;
 }
 
+sup, sub {
+  line-height: 0;
+}
+
 .footnote {
   font-size: 0.9rem;
   color: var(--fg);
