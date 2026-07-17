@@ -26,7 +26,7 @@ ROBOTS = TOOLS / "robots.txt"
 CONFIG = TOOLS / "config.toml"
 
 # Placeholders build() substitutes; a template missing any is stale or wrong.
-TEMPLATE_MARKERS = ("{{title}}", "{{nav}}", "{{content}}", "{{footer}}")
+TEMPLATE_MARKERS = ("{{title}}", "{{header}}", "{{nav}}", "{{content}}", "{{footer}}")
 
 EXTENSIONS = ["meta", "toc", "footnotes", "tables", "fenced_code"]
 
@@ -135,9 +135,20 @@ def build_masthead(cfg):
         name = htmllib.escape(str(link["name"]))
         url = htmllib.escape(str(link["url"]))
         items.append(f'<a href="{url}">{name}</a>')
-    if not items:
+
+    home = h.get("homelink")
+    if home is not None and not home.get("name"):
+        raise SystemExit("[header.homelink] needs a 'name'")
+    if not items and home is None:
         return (mode, "")
-    return (mode, '<nav class="masthead">' + "".join(items) + "</nav>")
+
+    links = f'<nav class="links">{"".join(items)}</nav>' if items else ""
+    if home is None:
+        # No homelink means nothing to pin left, so the bar lines up with the
+        # text column instead of spanning it (see .masthead.aligned in style.css).
+        return (mode, f'<header class="masthead aligned">{links}</header>')
+    name = htmllib.escape(str(home["name"]))
+    return (mode, f'<header class="masthead"><a href="/index.html">{name}</a>{links}</header>')
 
 
 # Reveal the current page: open the ancestor <details> chain of whichever
@@ -374,17 +385,16 @@ def build():
                 or (header_mode == "home" and is_readme)
                 or (header_mode == "not home" and not is_readme)
             )
-            if show_masthead:
-                body = masthead_html + body   # atop the content column
+            page_header = masthead_html if show_masthead else ""
             title = pick_title(md.Meta, body, path.stem, home if is_readme else None)
-            rendered.append((out, title, body, toc_nav))
+            rendered.append((out, title, body, toc_nav, page_header))
         else:
             # Non-md asset: copy through, preserving structure.
             asset_out = OUTPUT / rel
             asset_out.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, asset_out)
 
-    pages = [(out.relative_to(OUTPUT), title) for out, title, _, _ in rendered]
+    pages = [(out.relative_to(OUTPUT), title) for out, title, *_ in rendered]
     global_nav, scoped = "", {}
     if sidebar == "browse":
         global_nav = build_browse_nav(pages)
@@ -395,13 +405,14 @@ def build():
     # above, "" where a page has no TOC). In 'readme' mode a page inside a top-level
     # directory gets that section's scoped nav; anything else (root pages, and every
     # page in 'browse'/'none') gets global_nav.
-    for out, title, body, toc_nav in rendered:
+    for out, title, body, toc_nav, page_header in rendered:
         if sidebar == "toc":
             nav_html = toc_nav
         else:
             nav_html = scoped.get(out.relative_to(OUTPUT).parts[0], global_nav)
         page = (
             template.replace("{{title}}", htmllib.escape(title))
+            .replace("{{header}}", page_header)
             .replace("{{nav}}", nav_html)
             .replace("{{content}}", body)
             .replace("{{footer}}", footer_html)
@@ -451,6 +462,31 @@ def selfcheck():
         pass
     else:
         assert False, "unterminated TOC block should refuse to build"
+
+    link = {"name": "Blog", "url": "https://b.me"}
+    # No homelink: the bar carries the class that lines it up with the text column.
+    _, bar = build_masthead({"header": {"show": "all", "link": [link]}})
+    assert 'class="masthead aligned"' in bar
+    assert "/index.html" not in bar
+
+    # Homelink: full-width bar, home pinned left, and it points at the site root.
+    _, bar = build_masthead({"header": {"show": "all", "link": [link],
+                                        "homelink": {"name": "My Notes"}}})
+    assert 'class="masthead"' in bar
+    assert bar.index('href="/index.html"') < bar.index("Blog")
+
+    # A homelink alone is still a bar; nothing configured at all is not.
+    _, bar = build_masthead({"header": {"show": "all", "homelink": {"name": "N"}}})
+    assert "<header" in bar
+    assert build_masthead({"header": {"show": "all"}}) == ("all", "")
+
+    # A homelink without a name is a config error, not a nameless link.
+    try:
+        build_masthead({"header": {"show": "all", "homelink": {}}})
+    except SystemExit:
+        pass
+    else:
+        assert False, "[header.homelink] without a name should refuse to build"
     print("selfcheck ok")
 
 

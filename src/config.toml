@@ -1,26 +1,17 @@
 # Site configuration. Edit and re-run the build; setup.py won't overwrite this.
 
 [sidebar]
-# What goes in the left gutter:
-#   "none"   - no sidebar.
-#   "browse" - one sidebar for the whole site, as a collapsible folder tree.
-#   "readme" - global sidebar links to each top-level directory's README; opening
-#              one shows that directory's own tree (scoped), with a Home link back.
-#   "toc"    - each page's own table of contents (the block toc.py writes), moved
-#              out of the body into the sidebar. Pages without a TOC get no sidebar.
 mode = "none"
 
 [site-layout]
-# Override the homepage (README) title. Uncomment to use.
-# home = "Home"
+home = "Home"
 
-# Outbound-link bar atop a page. show is one of:
-#   "disabled" - never render
-#   "home"     - render on the homepage only.
-#   "not home" - render on every page except the homepage.
-#   "all"      - all pages
 # [header]
-# show = "home"
+# show = "all"
+#
+# [header.homelink]
+# name = "My Notes"
+#
 # [[header.link]]
 # name = "me.org"
 # url = "https://me.org"
@@ -28,14 +19,13 @@ mode = "none"
 # name = "Blog"
 # url = "https://blog.me.org"
 
-# Footer rendered on every page. Each line's text is markdown,.
 # [footer]
 # [[footer.line]]
 # text = "Copyright 2026 <Your Name>. Licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)"
 
 # Options for the standalone TOC builder (toc.py). Defaults shown.
 # [toc-builder]
-# max_depth = 6              # deepest heading level to list
+# max_depth = 6
 # slug_style = "site"        # "site" (matches the website build) | "github"
 # toc_title = "Table of Contents"
 

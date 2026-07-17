@@ -5,9 +5,9 @@ Provision a repo's `.tools/` with the pipeline: the scripts plus its content fil
     python setup.py /path/to/repo        # run from this checkout
     md-tools setup                       # run from inside the target repo
 
-The scripts, requirements.txt, template.html, and style.css are refreshed on every
-run, so a repo always carries the latest pipeline (and can build itself on a remote
-host without this checkout). The content files (config.toml, robots.txt) are written
+The scripts, requirements.txt and template.html are refreshed on every run, 
+so a repo always carries the latest pipeline (and can build itself on a remote
+host without this checkout). The content files (style.css, config.toml) are written
 only if absent, so custom edits survive.
 
 `--override` refreshes them to the shipped defaults (all, or just the ones you name).
@@ -50,7 +50,6 @@ def setup(root, override=None):
 
 
 def ensure_gitignore(root):
-    # The build output must never be committed; the server regenerates its own.
     gitignore = root / ".gitignore"
     lines = gitignore.read_text(encoding="utf-8").splitlines() if gitignore.exists() else []
     if ".public/" not in lines:
