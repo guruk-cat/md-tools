@@ -15,6 +15,7 @@ nav = "none"
 #   "disabled" - never render
 #   "home"     - render on the homepage only.
 #   "not home" - render on every page except the homepage.
+#   "all"      - all pages
 # [header]
 # show = "home"
 # [[header.link]]
@@ -27,9 +28,7 @@ nav = "none"
 # Footer rendered on every page. Each line's text is markdown,.
 # [footer]
 # [[footer.line]]
-# text = "© 2026 Your Name"
-# [[footer.line]]
-# text = "Licensed through [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)"
+# text = "Copyright 2026 <Your Name>. Licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)"
 
 # Options for the standalone TOC builder (toc.py). Defaults shown.
 # [toc-builder]
