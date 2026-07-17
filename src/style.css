@@ -230,8 +230,8 @@ pre code {
 }
 
 blockquote {
-  margin: 1rem 0;
-  padding: 0.25rem 1rem;
+  margin: 0;
+  padding: 0rem 1.5rem;
   border-left: 3px solid var(--border);
 }
 
