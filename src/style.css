@@ -123,6 +123,34 @@ footer {
   font-size: 0.9rem;
   text-transform: none;
   letter-spacing: normal;
+  list-style: none;      /* drop the native marker; we hang our own in the gutter */
+  position: relative;
+}
+
+/*
+  A top-level toc section is a <details> directly under <li>, so it otherwise
+  picks up the li > details nesting indent meant for 'readme' mode. Its label
+  should line up with the childless sections beside it. */
+.sidebar.toc li > details {
+  padding-left: 0;
+}
+
+/*
+  Reserve a left gutter on the top-level list so a section's label lines up
+  whether or not it folds. */
+.sidebar.toc > ul {
+  padding-left: 1.1rem;
+}
+
+.sidebar.toc summary::before {
+  content: "\25b8";           /* ▸ */
+  position: absolute;
+  left: -1.1rem;
+  color: var(--muted);
+}
+
+.sidebar.toc details[open] > summary::before {
+  content: "\25be";          /* ▾ */
 }
 
 .sidebar .toc-title {
