@@ -34,7 +34,7 @@ body {
   min-height: 100vh;
 }
 
-/* The container header, sidebar and body all align to. */
+/* Centered container: header, sidebar and body share its edges. */
 .page {
   flex: 1 0 auto;
   display: flex;
@@ -52,8 +52,7 @@ body {
   display: flex;
 }
 
-/* The text column's width and alignment live here, so main and footer can only
-   ever share an edge. Centered on its own; flush to the sidebar when there is one. */
+/* Text column. Centered alone; flush to the sidebar when there is one. */
 .column {
   flex: 1 1 auto;
   min-width: 0;
@@ -74,7 +73,7 @@ footer {
   color: var(--muted);
 }
 
-/* Rides down with the header, then pins. align-self is what lets sticky engage. */
+/* Sticky sidebar; align-self is what lets sticky engage. */
 .sidebar {
   position: sticky;
   top: 0;
@@ -88,10 +87,11 @@ footer {
   box-sizing: border-box;
 }
 
+/* 'browse'/'readme' mode folder labels. */
 .sidebar summary {
   cursor: pointer;
-  user-select: none;          /* no text-selection highlight when clicking to fold... */
-  -webkit-user-select: none;  /* ...Safari needs the prefix; the bare one is ignored there */
+  user-select: none;
+  -webkit-user-select: none;  /* Safari needs the prefix; the bare one is ignored there */
   margin: 0.6rem 0 0.3rem;
   font-size: 0.78rem;
   text-transform: uppercase;
@@ -99,15 +99,11 @@ footer {
   color: var(--muted);
 }
 
-/* Smaller native disclosure marker (the browser handles the open/closed glyph). */
 .sidebar summary::marker {
   font-size: 0.8em;
 }
 
-/*
-  Indent each nested level in. Nesting compounds naturally because every level
-  adds its own indent on top of its parent's. The li > rules cover 'readme' mode,
-  where a section's files nest under its README link. */
+/* Nested-level indent (compounds down the tree). */
 .sidebar details > ul,
 .sidebar details > details,
 .sidebar li > ul,
@@ -115,42 +111,23 @@ footer {
   padding-left: 0.75rem;
 }
 
-/*
-  'toc' mode: summaries are the page's own headings, so they read as links
-  rather than the folder labels 'browse'/'readme' put in a summary. */
-.sidebar.toc summary {
-  margin: 0.2rem 0;
-  font-size: 0.9rem;
-  text-transform: none;
-  letter-spacing: normal;
-  list-style: none;      /* drop the native marker; we hang our own in the gutter */
-  position: relative;
+/* 'toc' mode: flat bulleted list of the page's headings. */
+.sidebar.toc {
+  font-size: 0.8rem;
 }
 
-/*
-  A top-level toc section is a <details> directly under <li>, so it otherwise
-  picks up the li > details nesting indent meant for 'readme' mode. Its label
-  should line up with the childless sections beside it. */
-.sidebar.toc li > details {
-  padding-left: 0;
-}
-
-/*
-  Reserve a left gutter on the top-level list so a section's label lines up
-  whether or not it folds. */
-.sidebar.toc > ul {
+.sidebar.toc ul {
+  list-style: disc;
   padding-left: 1.1rem;
 }
 
-.sidebar.toc summary::before {
-  content: "\25b8";           /* ▸ */
-  position: absolute;
-  left: -1.1rem;
-  color: var(--muted);
+.sidebar.toc ul ul {
+  list-style: circle;
+  padding-left: 1.3rem;
 }
 
-.sidebar.toc details[open] > summary::before {
-  content: "\25be";          /* ▾ */
+.sidebar.toc li::marker {
+  color: var(--muted);
 }
 
 .sidebar .toc-title {
@@ -161,7 +138,7 @@ footer {
   color: var(--muted);
 }
 
-/* 'readme' mode: set the Home link apart from the section below it. */
+/* 'readme' mode Home link. */
 .sidebar .nav-home {
   margin-bottom: 0.75rem;
   padding-bottom: 0.75rem;
@@ -182,7 +159,7 @@ footer {
   margin-left: 0;
 }
 
-/* Below this, sidebar + main no longer fit side by side, so stack. */
+/* Narrow: stack sidebar above main. */
 @media (max-width: 64rem) {
   .layout {
     flex-direction: column;
@@ -200,7 +177,7 @@ footer {
   }
 }
 
-/* Outbound-link bar. In normal flow, so it scrolls away and the sidebar pins. */
+/* Outbound-link bar (in normal flow, scrolls away). */
 .masthead {
   display: flex;
   flex-wrap: wrap;
@@ -217,7 +194,7 @@ footer {
   gap: 1.25rem;
 }
 
-/* Dropping it on the first one starts the body text on the sidebar's first line. */
+/* Align body's first line with the sidebar's. */
 main > :first-child {
   margin-top: 0;
 }

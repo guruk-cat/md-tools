@@ -233,20 +233,15 @@ def toc_tree(items):
     return root
 
 
-def render_toc_nodes(nodes, top):
-    # Only first-level sections fold; everything under one renders with it.
+def render_toc_nodes(nodes):
+    # Flat nested list, every level shown; CSS bullets and indent do the styling.
     lines = ["<ul>"]
     for n in nodes:
         link = f'<a href="#{htmllib.escape(n["sid"])}">{inline_md(n["label"])}</a>'
-        if top and n["kids"]:
-            lines.append(f"<li><details><summary>{link}</summary>")
-            lines.extend(render_toc_nodes(n["kids"], False))
-            lines.append("</details></li>")
-        else:
-            lines.append(f"<li>{link}")
-            if n["kids"]:
-                lines.extend(render_toc_nodes(n["kids"], False))
-            lines.append("</li>")
+        lines.append(f"<li>{link}")
+        if n["kids"]:
+            lines.extend(render_toc_nodes(n["kids"]))
+        lines.append("</li>")
     lines.append("</ul>")
     return lines
 
@@ -256,7 +251,7 @@ def build_toc_nav(title, items):
     if not items:
         return ""
     head = [f'<div class="toc-title">{htmllib.escape(title)}</div>'] if title else []
-    body = render_toc_nodes(toc_tree(items), True)
+    body = render_toc_nodes(toc_tree(items))
     return "\n".join(['<nav class="sidebar toc">', *head, *body, "</nav>"])
 
 
@@ -457,10 +452,9 @@ def selfcheck():
                      (0, "2. Flat", "2-flat")]
 
     nav = build_toc_nav(title, items)
-    assert "<details><summary>" in nav          # section with children folds
+    assert "<details" not in nav                # flat list, no folding
     assert "<code>code</code>" in nav           # inline markdown in a heading renders
-    assert nav.count("<details>") == 1          # childless section stays a plain link
-    assert "open" not in nav                    # folded by default
+    assert nav.count("<ul>") == 2               # top list plus the one nested child list
 
     # A page with no TOC gets no sidebar at all, and its body is untouched.
     plain = "# Just a page\n\n## A\n"
