@@ -9,7 +9,9 @@ It does four things to the merged content:
 1. It strips manual heading numbers, so leftover numbering from the source files does not clash.
 2. It shifts heading levels, both per file and across the whole merge.
 3. It renumbers footnotes into one continuous sequence and gathers every definition at the foot.
-4. It optionally prepends fresh nested heading numbers (`1.`, `1.1.`).
+4. It optionally prepends fresh nested heading numbers (`--number`).
+
+Items 1 and 4 are `headings.py` logic, documented in the [heading numbering docs](headings.md). Item 3 is `notes.py` logic, documented in section 4 below because the cross-file behaviour is what makes it interesting.
 
 ## 2. Usage
 
@@ -55,27 +57,7 @@ python .tools/merge.py a.md b.md:+1 c.md --demote 1
 
 Every heading drops one level, and `b.md` then climbs back one from its suffix, so its headings end up unchanged while the others drop.
 
-### 3.3. Manual numbers are always stripped
-
-A leading manual number on a heading is removed regardless of any other option, because numbers from different source files will not line up once merged. A number is only recognised when it is followed by a separator and whitespace, so `## 2. Apples` becomes `## Apples` but `## 2 Apples` is left intact. The recognised forms are a dotted number (`1.`, `1.1.`, `2.3.1`) or a number with a single `:` or `)` terminator (`2:`, `1)`).
-
-## 4. Heading numbering
-
-By default the tool does not number headings. Pass `--number` to prepend nested numbers across the merged document.
-
-```sh
-python .tools/merge.py a.md b.md --number
-```
-
-Numbering anchors at H2 by default, so the first H2 becomes `1.`, its first H3 becomes `1.1.`, and any H1 is left unnumbered. Pass `--number-h1` to include H1 in the hierarchy instead; this also turns on numbering, so `--number` is not needed alongside it.
-
-```sh
-python .tools/merge.py a.md b.md --number-h1
-```
-
-When a level is skipped, the gap is filled with `1`. A jump straight from H2 to H4 produces `1.` and then `1.1.1.`.
-
-## 5. Footnotes
+## 4. Footnotes
 
 Each source file numbers its own footnotes independently, so `[^1]` in one file and `[^1]` in another are different notes. After merging, every reference is reassigned a unique number in order of first appearance across the whole document, and all definitions are collected at the foot.
 
@@ -86,18 +68,8 @@ Two edge cases:
 | A reference whose definition is absent from its source file | The reference is kept and its bracket text becomes the definition (`[^Oh, yes!]` becomes `[^1]` plus `[^1]: Oh, yes!`). |
 | A definition that is never referenced | It is kept at the foot under a `[^no-ref-N]` label. |
 
-Every surviving reference is rewritten to a freshly minted number in the same pass, so no original label lingers in the body to alias a reassigned one. That is what keeps a literal label from colliding with a reassigned number, whether the reference had a definition or not. 
+Every surviving reference is rewritten to a freshly minted number in the same pass, so no original label lingers in the body to alias a reassigned one. That is what keeps a literal label from colliding with a reassigned number, whether the reference had a definition or not.
 
-## 6. Not merged
+## 5. Not merged
 
-Front matter is not read. If a source file begins with a YAML front-matter block (delimited by `---`), that block is dropped before merging, and only the body is used. Fenced code blocks are tracked throughout, so a `#` inside a code fence is never mistaken for a heading.
-
-## 7. Notes
-
-The footnote logic lives in `notes.py` and the heading numbering in `headings.py`. Both are standalone tools (see the README), and `merge.py` imports them.
-
-The tool ships with a self-check covering the footnote round-trip, number stripping, heading shifts, and nested numbering. Run it against the script directly in the tools checkout:
-
-```sh
-python src/merge.py --selfcheck
-```
+Front matter is not read. If a source file begins with a YAML front-matter block (delimited by `---`), that block is dropped before merging, and only the body is used.

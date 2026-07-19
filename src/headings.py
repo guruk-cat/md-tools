@@ -11,22 +11,14 @@ alone); --number-h1 includes H1 in the hierarchy.
 """
 
 import argparse
-import re
-import tomllib
 from pathlib import Path
 
-FENCE_RE = re.compile(r"^\s*(```+|~~~+)")
-ATX_RE = re.compile(r"^ {0,3}(#{1,6})(?=[ \t]|$)(.*)$")
-TOC_OPEN = "<!-- toc -->"
-TOC_CLOSE = "<!-- /toc -->"
-CONFIG = Path.cwd() / ".tools" / "config.toml"
+from shared import TOC_CLOSE, TOC_OPEN, load_config, scan_fences
+import shared
 
 
 def load_exclude():
-    if not CONFIG.exists():
-        return []
-    with CONFIG.open("rb") as f:
-        return tomllib.load(f).get("exclude-headings", {}).get("titles", [])
+    return load_config().get("exclude-headings", {}).get("titles", [])
 
 
 def clamp(n, lo, hi):
@@ -58,14 +50,11 @@ def strip_number(text):
 
 
 def parse_heading(line):
-    # Returns (level, cleaned_text) for an ATX heading
-    # Fence tracking is the caller's job
-    m = ATX_RE.match(line)
-    if not m:
+    # The shared parser plus manual-number stripping. merge.py imports this one.
+    parsed = shared.parse_heading(line)
+    if not parsed:
         return None
-    level = len(m.group(1))
-    text = m.group(2).strip()
-    text = re.sub(r"#+$", "", text).strip()
+    level, text = parsed
     return level, strip_number(text)
 
 
@@ -85,15 +74,9 @@ def number_headings(doc, renumber, number_h1, exclude=()):
         return doc
     base = 1 if number_h1 else 2
     exclude = set(exclude)
-    out, fence, in_toc, counters = [], None, False, []
-    for line in doc.split("\n"):
-        fm = FENCE_RE.match(line)
-        if fm:
-            tok = fm.group(1)[0]
-            fence = tok if fence is None else (None if tok == fence else fence)
-            out.append(line)
-            continue
-        if fence:
+    out, in_toc, counters = [], False, []
+    for line, fenced in scan_fences(doc.split("\n")):
+        if fenced:
             out.append(line)
             continue
 

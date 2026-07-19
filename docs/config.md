@@ -2,7 +2,7 @@
 
 ## 1. Usage
 
-The setup script (`setup.py`) includes a scaffoleded `config.toml` in the `.tools/` directory of the target repo. You can edit this, and the build script (`build.py`) will respect preferences.
+The setup script (`setup.py`) scaffolds a `config.toml` into the `.tools/` directory of the target repo. Edit it there; the tools read it from the repo root on every run, and re-running setup will not overwrite it.
 
 ## 2. Keys for the website builder
 
@@ -23,9 +23,7 @@ Controls what the build puts in the left gutter.
 
 The build reads the block that `toc.py` writes (the `<!-- toc -->` ... `<!-- /toc -->` markers) and renders it into the sidebar. The block is taken out of the page body, so the contents appear once on the built page rather than twice. Your source `.md` file is not touched, so the TOC still renders inline when the file is read on GitHub or in an editor.
 
-Presentation follows Wikipedia's sidebar. First-level sections are foldable and start folded, so a long document shows a scannable list of its top-level sections on load. Everything nested beneath a first-level section appears when that section is expanded. Clicking a section both jumps to it and unfolds it.
-
-Which heading level counts as "first-level" is whatever `toc.py` put at the top of the block (H2 in a typical document with a single H1 title). The sidebar does not re-derive this; it reflects the nesting of the block as generated, including the `max_depth` cap from `[toc-builder]`.
+The list is rendered flat: every level is shown at once, with no folding, and nesting is conveyed by indent and bullet style. Depth therefore comes entirely from the block as `toc.py` generated it, including the `max_depth` cap from `[toc-builder]`. Capping `max_depth` is how you keep a deep document's sidebar short.
 
 A page whose markdown carries no TOC block gets no sidebar, and its content is centered exactly as it would be under `mode = "none"`. A page with an opening marker but no closing one fails the build rather than being rendered with a truncated body.
 
@@ -71,4 +69,4 @@ Each line's `text` is rendered as markdown, so it can mix plain words and inline
 
 ### 4.1. `[exclude-headings]` section
 
-- `titles`: a list of heading texts (matched without any manual number) to leave out of the numbering. An excluded heading keeps its text as-is and does not consume a counter, so its siblings number as if it were not there. The CLI `--exclude` flag overrides this list when given.
+- `titles`: a list of heading texts to leave out of the numbering, matched after any manual number is stripped. The CLI `--exclude` flag overrides this list when given. See the [heading numbering docs](headings.md) for the behaviour.

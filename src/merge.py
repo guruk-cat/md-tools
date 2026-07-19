@@ -19,8 +19,9 @@ import argparse
 import re
 from pathlib import Path
 
-from headings import FENCE_RE, clamp, parse_heading, number_headings
+from headings import clamp, parse_heading, number_headings
 from notes import renumber_footnotes, trim_blank
+from shared import scan_fences
 
 POS_RE = re.compile(r"^(.*):([+-]\d+)$")
 
@@ -35,15 +36,9 @@ def strip_frontmatter(text):
 
 
 def adjust_segment(body, adjust):
-    out, fence = [], None
-    for line in body.split("\n"):
-        fm = FENCE_RE.match(line)
-        if fm:
-            tok = fm.group(1)[0]
-            fence = tok if fence is None else (None if tok == fence else fence)
-            out.append(line)
-            continue
-        if fence:
+    out = []
+    for line, fenced in scan_fences(body.split("\n")):
+        if fenced:
             out.append(line)
             continue
         parsed = parse_heading(line)
@@ -118,22 +113,16 @@ def run(argv):
 
 
 def selfcheck():
-    # Round-trip through the shared footnote pass: two blobs each using
-    # [^1]/[^2] must merge to four distinct footnotes in reference order.
-    a = "Text A[^1] more[^2].\n\n[^1]: def a1\n[^2]: def a2"
-    b = "Text B[^1] more[^2].\n\n[^1]: def b1\n[^2]: def b2"
-    segs, defs = renumber_footnotes([adjust_segment(a, 0), adjust_segment(b, 0)])
-    joined = "\n\n".join(segs)
-    assert "Text A[^1] more[^2]." in joined
-    assert "Text B[^3] more[^4]." in joined
-    assert defs == [
-        "[^1]: def a1", "[^2]: def a2", "[^3]: def b1", "[^4]: def b2",
-    ]
-
-    # Per-file shift, manual-number strip, and fenced `#` left alone.
+    # The footnote round-trip itself is notes.py's selfcheck; this covers what
+    # merge.py adds on top: per-file shift, manual-number strip, fenced `#`.
     seg = adjust_segment("## 2. Apples\n\n```\n# not a heading\n```\n", 1)
     assert seg.startswith("# Apples")
     assert "# not a heading" in seg
+
+    # Frontmatter is dropped, and a shift can never push a heading out of bounds.
+    assert strip_frontmatter("---\ntitle: t\n---\n\n# A\n").strip() == "# A"
+    assert adjust_segment("###### A", -3) == "###### A"
+    assert adjust_segment("# A", 3) == "# A"
 
     print("selfcheck ok")
 

@@ -19,8 +19,10 @@ from pathlib import Path
 
 SRC = Path(__file__).resolve().parent / "src"
 
-# Refreshed every run
-CODE = ["build.py", "toc.py", "merge.py", "notes.py", "headings.py", "requirements.txt", "template.html", "robots.txt"]
+# Refreshed every run. Every .py here is imported by another, so a missing one
+# breaks the pipeline at runtime, not at setup.
+CODE = ["build.py", "toc.py", "merge.py", "notes.py", "headings.py", "shared.py",
+        "requirements.txt", "template.html", "robots.txt"]
 # Owned by the repo and customizable; not overwritten unless --override
 CONTENT = ["style.css", "config.toml"]
 

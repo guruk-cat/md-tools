@@ -13,26 +13,11 @@ in [toc-builder] for raw GitHub/editor viewing instead.
 """
 
 import re
-import tomllib
 from pathlib import Path
 
 from markdown.extensions.toc import slugify, unique
 
-CONFIG = Path.cwd() / ".tools" / "config.toml"
-
-TOC_OPEN = "<!-- toc -->"
-TOC_CLOSE = "<!-- /toc -->"
-
-FENCE_RE = re.compile(r"^\s*(```+|~~~+)")
-# ATX heading: 1-6 hashes, space, text, optional trailing hashes.
-ATX_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
-
-
-def load_config():
-    if not CONFIG.exists():
-        return {}
-    with CONFIG.open("rb") as f:
-        return tomllib.load(f)
+from shared import TOC_CLOSE, TOC_OPEN, load_config, parse_heading, scan_fences
 
 
 def github_slug(text):
@@ -69,22 +54,12 @@ def parse_headings(lines):
                 start = j + 1
                 break
     headings = []
-    fence = None
-    for idx in range(start, len(lines)):
-        line = lines[idx]
-        m = FENCE_RE.match(line)
-        if m:
-            tok = m.group(1)[0]
-            if fence is None:
-                fence = tok
-            elif tok == fence:
-                fence = None
+    for idx, (line, fenced) in enumerate(scan_fences(lines[start:]), start):
+        if fenced:
             continue
-        if fence:
-            continue
-        h = ATX_RE.match(line)
-        if h:
-            headings.append((len(h.group(1)), h.group(2).strip(), idx))
+        parsed = parse_heading(line)
+        if parsed:
+            headings.append((*parsed, idx))
     return headings, start
 
 
