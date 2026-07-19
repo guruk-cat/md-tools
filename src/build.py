@@ -8,14 +8,16 @@ Wraps each in `template.html`, and writes the mirror tree under `.public/`.
 Source files are never modified.
 """
 
-import html as htmllib
 import posixpath
 import re
 import shutil
-import tomllib
+from html import escape
 from pathlib import Path
+from typing import NamedTuple
 
 import markdown
+
+from shared import TOC_CLOSE, TOC_OPEN, load_config
 
 ROOT = Path.cwd()                 # run from your repo root; the code may live elsewhere (on PATH)
 TOOLS = ROOT / ".tools"           # per-repo content files live here, not next to the code
@@ -23,145 +25,170 @@ OUTPUT = ROOT / ".public"
 TEMPLATE = TOOLS / "template.html"
 STYLE = TOOLS / "style.css"
 ROBOTS = TOOLS / "robots.txt"
-CONFIG = TOOLS / "config.toml"
 
-# Placeholders build() substitutes; a template missing any is stale or wrong.
-TEMPLATE_MARKERS = ("{{title}}", "{{header}}", "{{nav}}", "{{content}}", "{{footer}}")
+# Placeholders fill_template() substitutes; a template missing any is stale or wrong.
+TEMPLATE_PLACEHOLDERS = ("{{title}}", "{{header}}", "{{nav}}", "{{content}}", "{{footer}}")
 
-EXTENSIONS = ["meta", "toc", "footnotes", "tables", "fenced_code"]
+MARKDOWN_EXTENSIONS = ["meta", "toc", "footnotes", "tables", "fenced_code"]
 
 SIDEBAR_MODES = ("none", "browse", "readme", "toc")
+HEADER_MODES = ("disabled", "home", "not home", "all")
 
-# Rewrite href="...md" / href="...md#anchor" on rendered HTML.
-# Matching the href attribute (not raw markdown) skips code blocks and covers reference links automatically.
-# Markers that turn a line into a block (list, heading, quote) when it leads one.
+# Matching the href attribute of rendered HTML (rather than raw markdown) skips
+# code blocks and covers reference-style links automatically.
+MD_HREF_RE = re.compile(r"""(href=["'])([^"']*\.md)((?:#[^"']*)?["'])""")
+ABSOLUTE_URL_RE = re.compile(r"[a-z][a-z0-9+.-]*://")
+
+# Markers that turn a line into a block (list, heading, quote) when they lead one.
 LEADING_BLOCK_RE = re.compile(r"^\s*([#>]+|\d+[.)]|[-+*])(?=\s|$)")
 
-LINK_RE = re.compile(r"""(href=["'])([^"']*\.md)((?:#[^"']*)?["'])""")
 H1_RE = re.compile(r"<h1[^>]*>(.*?)</h1>", re.DOTALL)
-TAG_RE = re.compile(r"<[^>]+>")
+HTML_TAG_RE = re.compile(r"<[^>]+>")
 
-# Markers and item shape that toc.py writes; 'toc' mode reads the block back out.
-TOC_OPEN = "<!-- toc -->"
-TOC_CLOSE = "<!-- /toc -->"
+# The item shape toc.py writes; 'toc' sidebar mode reads the block back out.
 TOC_ITEM_RE = re.compile(r"^(\s*)- \[(.+)\]\(#(.+)\)\s*$")
-TOC_TITLE_RE = re.compile(r"^##\s+(.*?)\s*#*\s*$")
-TOC_INDENT = 4  # toc.py indents one nesting level per 4 spaces
+TOC_HEADING_RE = re.compile(r"^##\s+(.*?)\s*#*\s*$")
+TOC_INDENT_WIDTH = 4  # toc.py indents one nesting level per 4 spaces
 
 
-def make_md():
-    return markdown.Markdown(extensions=EXTENSIONS)
+class RenderedPage(NamedTuple):
+    """A page rendered in memory, not yet written to disk."""
+    out_path: Path      # absolute, under OUTPUT
+    title: str
+    body_html: str
+    toc_nav_html: str   # 'toc' sidebar mode only; "" otherwise
+    header_html: str    # "" where this page does not carry the masthead
 
 
-def render(md, text):
-    # reset() is mandatory: 
+class NavEntry(NamedTuple):
+    """One page as the sidebar builders see it."""
+    out_path: Path      # relative to OUTPUT
+    title: str
+
+
+class Asset(NamedTuple):
+    """A non-markdown file to copy through unchanged."""
+    source: Path
+    out_path: Path      # absolute, under OUTPUT
+
+
+def make_markdown():
+    return markdown.Markdown(extensions=MARKDOWN_EXTENSIONS)
+
+
+def render_markdown(renderer, text):
+    # reset() is mandatory:
     # footnotes/meta state accumulates on the instance and would leak between files otherwise.
-    md.reset()
-    return md.convert(text)
+    renderer.reset()
+    return renderer.convert(text)
 
 
-def rewrite_links(body, page_rel):
-    # Rewrite internal `.md` links to root-absolute `.html` URLs.
-    # page_rel    : the page's path relative to the output root. 
-    page_dir = page_rel.parent.as_posix()
+def rewrite_md_links(body_html, page_out_path):
+    # Point internal `.md` links at the root-absolute `.html` URLs the build produces.
+    # page_out_path is relative to the output root, so sibling links resolve.
+    page_dir = page_out_path.parent.as_posix()
 
-    def repl(m):
-        url = m.group(2)
-        if re.match(r"[a-z][a-z0-9+.-]*://", url) or url.startswith("//"):
-            return m.group(0)  # leave external links alone
-        target = posixpath.normpath(posixpath.join(page_dir, url[:-3]))
-        href = "/index.html" if target == "README" else "/" + target + ".html"
-        return m.group(1) + href + m.group(3)
+    def to_html_url(match):
+        opening_quote, url, closing_quote = match.groups()
+        if ABSOLUTE_URL_RE.match(url) or url.startswith("//"):
+            return match.group(0)  # leave external links alone
+        without_suffix = url[:-len(".md")]
+        target = posixpath.normpath(posixpath.join(page_dir, without_suffix))
+        href = "/index.html" if target == "README" else f"/{target}.html"
+        return opening_quote + href + closing_quote
 
-    return LINK_RE.sub(repl, body)
+    return MD_HREF_RE.sub(to_html_url, body_html)
 
 
-def pick_title(meta, body, stem, home=None):
-    # home: config override for the homepage (README), wins over everything.
-    if home:
-        return home
+def pick_title(meta, body_html, filename_stem, home_override=None):
+    # home_override: the config title for the homepage (README), which wins over everything.
+    if home_override:
+        return home_override
     if meta.get("title"):
         return meta["title"][0]
-    m = H1_RE.search(body)
-    if m:
-        return TAG_RE.sub("", m.group(1)).strip()
-    return stem
+    first_h1 = H1_RE.search(body_html)
+    if first_h1:
+        return HTML_TAG_RE.sub("", first_h1.group(1)).strip()
+    return filename_stem
 
 
-def load_config():
-    if not CONFIG.exists():
-        return {}
-    with CONFIG.open("rb") as f:
-        return tomllib.load(f)
-
-
-def escape_leading(m):
+def escape_block_marker(match):
     # A numeric marker needs the backslash on its punctuation ("1\."), the rest
     # on the character itself ("\-").
-    tok = m.group(1)
-    if tok[0].isdigit():
-        return m.group(0).replace(tok, tok[:-1] + "\\" + tok[-1])
-    return m.group(0).replace(tok, "\\" + tok[0] + tok[1:])
+    marker = match.group(1)
+    if marker[0].isdigit():
+        escaped = marker[:-1] + "\\" + marker[-1]
+    else:
+        escaped = "\\" + marker
+    return match.group(0).replace(marker, escaped)
 
 
-def inline_md(text):
+def render_inline_markdown(text):
     # markdown.markdown parses its argument as a block, so a heading numbered
     # "1." arrives as an <ol>, not text. Escaping a leading block marker keeps it
     # literal; inline markup (links, `code`) still renders.
-    text = LEADING_BLOCK_RE.sub(escape_leading, str(text))
-    return markdown.markdown(text).removeprefix("<p>").removesuffix("</p>")
+    escaped = LEADING_BLOCK_RE.sub(escape_block_marker, str(text))
+    return markdown.markdown(escaped).removeprefix("<p>").removesuffix("</p>")
 
 
-def build_footer(cfg):
-    # Footer HTML from [footer] lines, or "" if no [footer] section is configured.
-    # Each [[footer.line]] carries `text` rendered as markdown
-    f = cfg.get("footer")
-    if f is None:
+def page_link_html(out_path, title):
+    return f'<a href="/{out_path.as_posix()}">{escape(title)}</a>'
+
+
+def build_footer(config):
+    # Each [[footer.line]] carries a `text` rendered as markdown.
+    footer_config = config.get("footer")
+    if footer_config is None:
         return ""
-    lines = []
-    for line in f.get("line", []):
+    line_tags = []
+    for line in footer_config.get("line", []):
         text = line.get("text")
         if not text:
             raise SystemExit("[[footer.line]] entries each need a 'text'")
-        lines.append(f"<div>{inline_md(text)}</div>")
-    if not lines:
+        line_tags.append(f"<div>{render_inline_markdown(text)}</div>")
+    if not line_tags:
         return ""
-    return "<footer>" + "".join(lines) + "</footer>"
+    return "<footer>" + "".join(line_tags) + "</footer>"
 
 
-HEADER_MODES = ("disabled", "home", "not home", "all")
-
-
-def build_masthead(cfg):
-    # (mode, html): mode decides which pages carry the bar 
-    # ("home" | "not home" | "all" | "disabled")
-    h = cfg.get("header")
-    if not h:
+def build_masthead(config):
+    # Returns (mode, html). The mode decides which pages carry the bar; build()
+    # applies it per page.
+    header_config = config.get("header")
+    if not header_config:
         return ("disabled", "")
-    mode = h.get("show", "disabled")
+
+    mode = header_config.get("show", "disabled")
     if mode not in HEADER_MODES:
         raise SystemExit(f"[header] show must be one of {', '.join(HEADER_MODES)}; got {mode!r}")
     if mode == "disabled":
         return (mode, "")
-    items = []
-    for link in h.get("link", []):
+
+    link_tags = []
+    for link in header_config.get("link", []):
         if not link.get("name") or not link.get("url"):
             raise SystemExit("[[header.link]] entries each need both 'name' and 'url'")
-        name = htmllib.escape(str(link["name"]))
-        url = htmllib.escape(str(link["url"]))
-        items.append(f'<a href="{url}">{name}</a>')
+        link_tags.append(f'<a href="{escape(str(link["url"]))}">{escape(str(link["name"]))}</a>')
 
-    home = h.get("homelink")
-    if home is not None and not home.get("name"):
+    homelink = header_config.get("homelink")
+    if homelink is not None and not homelink.get("name"):
         raise SystemExit("[header.homelink] needs a 'name'")
-    if not items and home is None:
+    if not link_tags and homelink is None:
         return (mode, "")
 
-    links = f'<nav class="links">{"".join(items)}</nav>' if items else ""
-    if home is None:
-        return (mode, f'<header class="masthead">{links}</header>')
-    name = htmllib.escape(str(home["name"]))
-    return (mode, f'<header class="masthead"><a href="/index.html">{name}</a>{links}</header>')
+    links_html = f'<nav class="links">{"".join(link_tags)}</nav>' if link_tags else ""
+    if homelink is None:
+        return (mode, f'<header class="masthead">{links_html}</header>')
+    home_html = f'<a href="/index.html">{escape(str(homelink["name"]))}</a>'
+    return (mode, f'<header class="masthead">{home_html}{links_html}</header>')
+
+
+def page_carries_masthead(mode, is_homepage):
+    return (
+        mode == "all"
+        or (mode == "home" and is_homepage)
+        or (mode == "not home" and not is_homepage)
+    )
 
 
 # Reveal the current page: open the ancestor <details> chain of whichever
@@ -188,249 +215,316 @@ NAV_SCRIPT = """<script>
 </script>"""
 
 
-def home_link(title):
-    return f'<ul class="nav-home"><li><a href="/index.html">{htmllib.escape(title)}</a></li></ul>'
+def home_link_html(title):
+    return f'<ul class="nav-home"><li><a href="/index.html">{escape(title)}</a></li></ul>'
 
 
-def parse_toc_block(text, source):
+class TocItem(NamedTuple):
+    depth: int          # 0 for the block's topmost level
+    label: str
+    anchor: str
+
+
+def parse_toc_block(text, source_path):
     # Pull toc.py's block out of the markdown source: 'toc' mode shows it in the
     # sidebar instead of the body, so it must not render twice.
-    # Returns (text_without_block, title, [(level, label, sid)]); no block -> unchanged text.
+    # Returns (text_without_block, block_title, [TocItem]); no block -> text unchanged.
     lines = text.split("\n")
-    start = next((i for i, ln in enumerate(lines) if ln.strip() == TOC_OPEN), None)
-    if start is None:
+    open_idx = next((i for i, line in enumerate(lines) if line.strip() == TOC_OPEN), None)
+    if open_idx is None:
         return text, "", []
-    end = next((j for j in range(start + 1, len(lines)) if lines[j].strip() == TOC_CLOSE), None)
-    if end is None:
+    close_idx = next(
+        (i for i in range(open_idx + 1, len(lines)) if lines[i].strip() == TOC_CLOSE), None
+    )
+    if close_idx is None:
         raise SystemExit(
-            f"{source}: unterminated TOC block: found '{TOC_OPEN}' with no matching "
+            f"{source_path}: unterminated TOC block: found '{TOC_OPEN}' with no matching "
             f"'{TOC_CLOSE}'. Fix the markers; refusing to build."
         )
-    title, items = "", []
-    for line in lines[start + 1:end]:
-        m = TOC_ITEM_RE.match(line)
-        if m:
-            items.append((len(m.group(1)) // TOC_INDENT, m.group(2), m.group(3)))
+
+    block_title, items = "", []
+    for line in lines[open_idx + 1:close_idx]:
+        item = TOC_ITEM_RE.match(line)
+        if item:
+            indent, label, anchor = item.groups()
+            items.append(TocItem(len(indent) // TOC_INDENT_WIDTH, label, anchor))
             continue
-        t = TOC_TITLE_RE.match(line)
-        if t and not title:
-            title = t.group(1)
-    return "\n".join(lines[:start] + lines[end + 1:]), title, items
+        heading = TOC_HEADING_RE.match(line)
+        if heading and not block_title:
+            block_title = heading.group(1)
+
+    remaining = lines[:open_idx] + lines[close_idx + 1:]
+    return "\n".join(remaining), block_title, items
 
 
-def toc_tree(items):
-    # Flat (level, label, sid) list -> nested nodes. A level that skips a rung
-    # (H2 straight to H4) just nests one level; the TOC is for navigating, not
-    # for reproducing the heading arithmetic.
-    root = []
-    stack = [(-1, root)]
-    for level, label, sid in items:
-        node = {"label": label, "sid": sid, "kids": []}
-        while stack[-1][0] >= level:
-            stack.pop()
-        stack[-1][1].append(node)
-        stack.append((level, node["kids"]))
-    return root
+class TocNode(NamedTuple):
+    label: str
+    anchor: str
+    children: list
+
+
+def nest_toc_items(items):
+    # Flat TocItems -> nested TocNodes. A depth that skips a rung (H2 straight to
+    # H4) just nests one level; the TOC is for navigating, not for reproducing
+    # the heading arithmetic.
+    roots = []
+    open_nodes = [(-1, roots)]  # (depth, sibling list to append into)
+    for item in items:
+        node = TocNode(item.label, item.anchor, [])
+        while open_nodes[-1][0] >= item.depth:
+            open_nodes.pop()
+        open_nodes[-1][1].append(node)
+        open_nodes.append((item.depth, node.children))
+    return roots
 
 
 def render_toc_nodes(nodes):
     # Flat nested list, every level shown; CSS bullets and indent do the styling.
     lines = ["<ul>"]
-    for n in nodes:
-        link = f'<a href="#{htmllib.escape(n["sid"])}">{inline_md(n["label"])}</a>'
+    for node in nodes:
+        link = f'<a href="#{escape(node.anchor)}">{render_inline_markdown(node.label)}</a>'
         lines.append(f"<li>{link}")
-        if n["kids"]:
-            lines.extend(render_toc_nodes(n["kids"]))
+        if node.children:
+            lines.extend(render_toc_nodes(node.children))
         lines.append("</li>")
     lines.append("</ul>")
     return lines
 
 
-def build_toc_nav(title, items):
+def build_toc_nav(block_title, items):
     # "" when the page carries no TOC: that page simply gets no sidebar.
     if not items:
         return ""
-    head = [f'<div class="toc-title">{htmllib.escape(title)}</div>'] if title else []
-    body = render_toc_nodes(toc_tree(items))
-    return "\n".join(['<nav class="sidebar toc">', *head, *body, "</nav>"])
+    heading = [f'<div class="toc-title">{escape(block_title)}</div>'] if block_title else []
+    body = render_toc_nodes(nest_toc_items(items))
+    return "\n".join(['<nav class="sidebar toc">', *heading, *body, "</nav>"])
 
 
-def nav_tree(pages):
-    # tree node: {"files": [(title, out)], "dirs": {name: node}}
-    tree = {"files": [], "dirs": {}}
-    for out, title in pages:
+def new_tree_node():
+    return {"entries": [], "subdirs": {}}
+
+
+def build_nav_tree(entries):
+    # Group NavEntries into nested {"entries": [...], "subdirs": {name: node}}.
+    tree = new_tree_node()
+    for entry in entries:
         node = tree
-        for part in out.parent.parts:  # () at root, ("notes",), ("notes","sub"), ...
-            node = node["dirs"].setdefault(part, {"files": [], "dirs": {}})
-        node["files"].append((title, out))
+        for part in entry.out_path.parent.parts:  # () at root, ("notes",), ("notes","sub"), ...
+            node = node["subdirs"].setdefault(part, new_tree_node())
+        node["entries"].append(entry)
     return tree
 
 
-def render_tree(node):
-    # Collapsible tree of a node's files and subfolders.
+def render_nav_tree(node):
+    # Collapsible tree of a node's pages and subfolders.
     lines = []
-    files = sorted(node["files"], key=lambda t: t[0].lower())
-    if files:
+    entries = sorted(node["entries"], key=lambda entry: entry.title.lower())
+    if entries:
         lines.append("<ul>")
-        for title, out in files:
-            href = "/" + out.as_posix()
-            lines.append(f'<li><a href="{href}">{htmllib.escape(title)}</a></li>')
+        for entry in entries:
+            lines.append(f"<li>{page_link_html(entry.out_path, entry.title)}</li>")
         lines.append("</ul>")
-    for name in sorted(node["dirs"]):
+    for name in sorted(node["subdirs"]):
         lines.append("<details>")
-        lines.append(f"<summary>{htmllib.escape(name)}</summary>")
-        lines.extend(render_tree(node["dirs"][name]))
+        lines.append(f"<summary>{escape(name)}</summary>")
+        lines.extend(render_nav_tree(node["subdirs"][name]))
         lines.append("</details>")
     return lines
 
 
-def wrap_nav(lines):
+def wrap_sidebar(lines):
     return "\n".join(['<nav class="sidebar">', *lines, "</nav>", NAV_SCRIPT])
 
 
-def build_browse_nav(pages):
+def build_browse_nav(entries):
     # One shared sidebar: the whole site as a collapsible tree.
-    return wrap_nav(render_tree(nav_tree(pages)))
+    return wrap_sidebar(render_nav_tree(build_nav_tree(entries)))
 
 
-def build_readme_navs(pages):
-    # 'readme' mode. Returns (global_nav, {section: scoped_nav}).
-    # Global nav (shown on root-level pages): root file links, then a link to each
+HOMEPAGE_OUT_PATH = Path("index.html")
+
+
+def build_readme_navs(entries):
+    # 'readme' mode. Returns (global_nav, {section_name: scoped_nav}).
+    # Global nav (shown on root-level pages): root page links, then a link to each
     # top-level directory's README (directories without one are omitted).
     # Scoped nav (shown on a page inside a top-level directory): that directory's
     # own subtree browsed in full, with a Home link back to the site root on top.
-    root_files, sections = [], {}
-    for out, title in pages:
-        if len(out.parts) == 1:
-            root_files.append((out, title))
+    root_entries, sections = [], {}
+    for entry in entries:
+        if len(entry.out_path.parts) == 1:
+            root_entries.append(entry)
         else:
-            sections.setdefault(out.parts[0], []).append((out, title))
+            sections.setdefault(entry.out_path.parts[0], []).append(entry)
 
-    # Back-home link reuses the homepage's own title (which already carries the
+    # The back-home link reuses the homepage's own title (which already carries the
     # `home` config override), so it matches the pinned entry in the global nav.
-    home_title = next((t for o, t in root_files if o == Path("index.html")), "Home")
+    home_title = next(
+        (entry.title for entry in root_entries if entry.out_path == HOMEPAGE_OUT_PATH), "Home"
+    )
 
-    lines, section_items, scoped = [], [], {}
-    if root_files:
-        # Homepage pinned first; the rest of the root files follow alphabetically.
-        home = [p for p in root_files if p[0] == Path("index.html")]
-        rest = sorted((p for p in root_files if p[0] != Path("index.html")),
-                      key=lambda x: x[1].lower())
-        items = "".join(
-            f'<li><a href="/{o.as_posix()}">{htmllib.escape(t)}</a></li>'
-            for o, t in home + rest
+    global_lines, section_links, scoped_navs = [], [], {}
+    if root_entries:
+        # Homepage pinned first; the rest of the root pages follow alphabetically.
+        homepage = [e for e in root_entries if e.out_path == HOMEPAGE_OUT_PATH]
+        others = sorted(
+            (e for e in root_entries if e.out_path != HOMEPAGE_OUT_PATH),
+            key=lambda entry: entry.title.lower(),
         )
-        lines.append(f"<ul>{items}</ul>")
+        items = "".join(
+            f"<li>{page_link_html(entry.out_path, entry.title)}</li>"
+            for entry in homepage + others
+        )
+        global_lines.append(f"<ul>{items}</ul>")
 
     for name in sorted(sections):
-        node = nav_tree(sections[name])["dirs"][name]  # every page here shares `name` as parts[0]
-        readme_out = Path(name) / "README.html"
-        readme = next((f for f in node["files"] if f[1] == readme_out), None)
+        # Every page in this section shares `name` as parts[0], so descend once.
+        section_node = build_nav_tree(sections[name])["subdirs"][name]
+        readme_out_path = Path(name) / "README.html"
+        readme = next(
+            (e for e in section_node["entries"] if e.out_path == readme_out_path), None
+        )
         if readme:
-            # README heads the section; its siblings nest one level beneath it.
-            title, out = readme
-            siblings = {"files": [f for f in node["files"] if f[1] != readme_out],
-                        "dirs": node["dirs"]}
-            link = f'<a href="/{out.as_posix()}">{htmllib.escape(title)}</a>'
-            section = [f"<ul><li>{link}", *render_tree(siblings), "</li></ul>"]
-            section_items.append(f"<li>{link}</li>")
+            # The README heads the section; its siblings nest one level beneath it.
+            readme_link = page_link_html(readme.out_path, readme.title)
+            siblings = {
+                "entries": [e for e in section_node["entries"] if e != readme],
+                "subdirs": section_node["subdirs"],
+            }
+            section_lines = [f"<ul><li>{readme_link}", *render_nav_tree(siblings), "</li></ul>"]
+            section_links.append(f"<li>{readme_link}</li>")
         else:
-            section = render_tree(node)
-        scoped[name] = wrap_nav([home_link(home_title), *section])
+            section_lines = render_nav_tree(section_node)
+        scoped_navs[name] = wrap_sidebar([home_link_html(home_title), *section_lines])
 
-    if section_items:
-        lines.append("<ul>" + "".join(section_items) + "</ul>")
-    return wrap_nav(lines), scoped
+    if section_links:
+        global_lines.append("<ul>" + "".join(section_links) + "</ul>")
+    return wrap_sidebar(global_lines), scoped_navs
+
+
+def read_sidebar_mode(config):
+    mode = config.get("sidebar", {}).get("mode", "none")
+    if mode not in SIDEBAR_MODES:
+        raise SystemExit(f"[sidebar] mode must be one of {', '.join(SIDEBAR_MODES)}; got {mode!r}")
+    return mode
+
+
+def read_template():
+    missing = [path for path in (TEMPLATE, STYLE, ROBOTS) if not path.exists()]
+    if missing:
+        raise SystemExit(
+            f"missing {', '.join(str(path) for path in missing)}. "
+            f"Run 'md-tools setup' in this repo first."
+        )
+    template = TEMPLATE.read_text(encoding="utf-8")
+    absent = [name for name in TEMPLATE_PLACEHOLDERS if name not in template]
+    if absent:
+        raise SystemExit(
+            f"{TEMPLATE} is missing placeholder(s) {', '.join(absent)}; it may be from an "
+            f"older version. Run 'md-tools setup --override template.html'. Refusing to build."
+        )
+    return template
+
+
+def iter_source_files():
+    # Every file in the repo except those under a dot-directory (.tools, .public, .git, ...).
+    for path in ROOT.rglob("*"):
+        relative = path.relative_to(ROOT)
+        if any(part.startswith(".") for part in relative.parts) or path.is_dir():
+            continue
+        yield path, relative
+
+
+def fill_template(template, page, nav_html, footer_html):
+    return (
+        template.replace("{{title}}", escape(page.title))
+        .replace("{{header}}", page.header_html)
+        .replace("{{nav}}", nav_html)
+        .replace("{{content}}", page.body_html)
+        .replace("{{footer}}", footer_html)
+    )
 
 
 def build():
-    cfg = load_config()
-    sidebar = cfg.get("sidebar", {}).get("mode", "none")
-    if sidebar not in SIDEBAR_MODES:
-        raise SystemExit(f"[sidebar] mode must be one of {', '.join(SIDEBAR_MODES)}; got {sidebar!r}")
-    home = cfg.get("site-layout", {}).get("home")
-    footer_html = build_footer(cfg)
-    header_mode, masthead_html = build_masthead(cfg)
+    config = load_config()
+    sidebar_mode = read_sidebar_mode(config)
+    home_title_override = config.get("site-layout", {}).get("home")
+    footer_html = build_footer(config)
+    header_mode, masthead_html = build_masthead(config)
 
+    # Everything that can fail runs before OUTPUT is touched, so a refused build
+    # leaves the previous one standing.
+    template = read_template()
+    renderer = make_markdown()
+
+    pages, assets = [], []
+    for source_path, relative_path in iter_source_files():
+        if source_path.suffix != ".md":
+            assets.append(Asset(source_path, OUTPUT / relative_path))
+            continue
+
+        is_homepage = relative_path == Path("README.md")
+        out_path = OUTPUT / (
+            HOMEPAGE_OUT_PATH if is_homepage else relative_path.with_suffix(".html")
+        )
+
+        text = source_path.read_text(encoding="utf-8")
+        toc_nav_html = ""
+        if sidebar_mode == "toc":
+            text, block_title, toc_items = parse_toc_block(text, relative_path)
+            toc_nav_html = build_toc_nav(block_title, toc_items)
+
+        body_html = rewrite_md_links(
+            render_markdown(renderer, text), out_path.relative_to(OUTPUT)
+        )
+        pages.append(RenderedPage(
+            out_path=out_path,
+            title=pick_title(
+                renderer.Meta, body_html, source_path.stem,
+                home_title_override if is_homepage else None,
+            ),
+            body_html=body_html,
+            toc_nav_html=toc_nav_html,
+            header_html=(
+                masthead_html
+                if masthead_html and page_carries_masthead(header_mode, is_homepage)
+                else ""
+            ),
+        ))
+
+    nav_entries = [NavEntry(page.out_path.relative_to(OUTPUT), page.title) for page in pages]
+    global_nav, scoped_navs = "", {}
+    if sidebar_mode == "browse":
+        global_nav = build_browse_nav(nav_entries)
+    elif sidebar_mode == "readme":
+        global_nav, scoped_navs = build_readme_navs(nav_entries)
+
+    # Past every check that can refuse: safe to replace the previous build.
     if OUTPUT.exists():
         shutil.rmtree(OUTPUT)
     OUTPUT.mkdir(parents=True)
 
-    if not TEMPLATE.exists():
-        raise SystemExit(f"missing {TEMPLATE}. Run 'md-tools setup' in this repo first.")
-    template = TEMPLATE.read_text(encoding="utf-8")
-    stale = [m for m in TEMPLATE_MARKERS if m not in template]
-    if stale:
-        raise SystemExit(
-            f"{TEMPLATE} is missing placeholder(s) {', '.join(stale)}; it may be from an "
-            f"older version. Run 'md-tools setup --override template.html'. Refusing to build."
-        )
-    md = make_md()
+    for asset in assets:
+        asset.out_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(asset.source, asset.out_path)
 
-    # Render every page and collect (output path, title) before writing
-    rendered = []  # (out_path, title, body, toc_nav)
-    for path in ROOT.rglob("*"):
-        # Skip dot-dirs (.tools, .public, .git, ...)
-        if any(part.startswith(".") for part in path.relative_to(ROOT).parts):
-            continue
-        if path.is_dir():
-            continue
-
-        rel = path.relative_to(ROOT)
-        if path.suffix == ".md":
-            out = OUTPUT / rel.with_suffix(".html")
-            is_readme = rel == Path("README.md")
-            if is_readme:
-                out = OUTPUT / "index.html"
-            text = path.read_text(encoding="utf-8")
-            toc_nav = ""
-            if sidebar == "toc":
-                text, toc_title, toc_items = parse_toc_block(text, rel)
-                toc_nav = build_toc_nav(toc_title, toc_items)
-            body = rewrite_links(render(md, text), out.relative_to(OUTPUT))
-            show_masthead = masthead_html and (
-                header_mode == "all"
-                or (header_mode == "home" and is_readme)
-                or (header_mode == "not home" and not is_readme)
-            )
-            page_header = masthead_html if show_masthead else ""
-            title = pick_title(md.Meta, body, path.stem, home if is_readme else None)
-            rendered.append((out, title, body, toc_nav, page_header))
+    for page in pages:
+        # 'toc' mode is per-page ("" where a page has no TOC). In 'readme' mode a
+        # page inside a top-level directory gets that section's scoped nav; anything
+        # else (root pages, and every page in 'browse'/'none') gets the global one.
+        if sidebar_mode == "toc":
+            nav_html = page.toc_nav_html
         else:
-            # Non-md asset: copy through, preserving structure.
-            asset_out = OUTPUT / rel
-            asset_out.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(path, asset_out)
-
-    pages = [(out.relative_to(OUTPUT), title) for out, title, *_ in rendered]
-    global_nav, scoped = "", {}
-    if sidebar == "browse":
-        global_nav = build_browse_nav(pages)
-    elif sidebar == "readme":
-        global_nav, scoped = build_readme_navs(pages)
-
-    # Write pages, each with its sidebar injected. 'toc' mode is per-page (built
-    # above, "" where a page has no TOC). In 'readme' mode a page inside a top-level
-    # directory gets that section's scoped nav; anything else (root pages, and every
-    # page in 'browse'/'none') gets global_nav.
-    for out, title, body, toc_nav, page_header in rendered:
-        if sidebar == "toc":
-            nav_html = toc_nav
-        else:
-            nav_html = scoped.get(out.relative_to(OUTPUT).parts[0], global_nav)
-        page = (
-            template.replace("{{title}}", htmllib.escape(title))
-            .replace("{{header}}", page_header)
-            .replace("{{nav}}", nav_html)
-            .replace("{{content}}", body)
-            .replace("{{footer}}", footer_html)
+            section_name = page.out_path.relative_to(OUTPUT).parts[0]
+            nav_html = scoped_navs.get(section_name, global_nav)
+        page.out_path.parent.mkdir(parents=True, exist_ok=True)
+        page.out_path.write_text(
+            fill_template(template, page, nav_html, footer_html), encoding="utf-8"
         )
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(page, encoding="utf-8")
 
     shutil.copy2(STYLE, OUTPUT / "style.css")
     shutil.copy2(ROBOTS, OUTPUT / "robots.txt")
-    print(f"built -> {OUTPUT}" + (f" (sidebar: {sidebar})" if sidebar != "none" else ""))
+    print(f"built -> {OUTPUT}" + (f" (sidebar: {sidebar_mode})" if sidebar_mode != "none" else ""))
 
 
 def selfcheck():
@@ -447,9 +541,9 @@ def selfcheck():
     assert TOC_OPEN not in body and "1. Intro](#" not in body  # block left the body
     assert "# Title" in body and "## 1. Intro" in body         # rest of the page survived
     assert title == "Table of Contents"
-    assert items == [(0, "1. Intro", "1-intro"),
-                     (1, "1.1. The `code` bit", "11-the-code-bit"),
-                     (0, "2. Flat", "2-flat")]
+    assert items == [TocItem(0, "1. Intro", "1-intro"),
+                     TocItem(1, "1.1. The `code` bit", "11-the-code-bit"),
+                     TocItem(0, "2. Flat", "2-flat")]
 
     nav = build_toc_nav(title, items)
     assert "<details" not in nav                # flat list, no folding
@@ -458,9 +552,8 @@ def selfcheck():
 
     # A page with no TOC gets no sidebar at all, and its body is untouched.
     plain = "# Just a page\n\n## A\n"
-    b, t, i = parse_toc_block(plain, "p.md")
-    assert (b, t, i) == (plain, "", [])
-    assert build_toc_nav(t, i) == ""
+    assert parse_toc_block(plain, "p.md") == (plain, "", [])
+    assert build_toc_nav("", []) == ""
 
     # Unterminated block must refuse rather than swallow the page.
     try:
@@ -469,6 +562,16 @@ def selfcheck():
         pass
     else:
         assert False, "unterminated TOC block should refuse to build"
+
+    # Links are rewritten root-absolute, relative to the linking page's folder.
+    body = rewrite_md_links(
+        '<a href="sub/other.md">x</a> <a href="../README.md#top">y</a> '
+        '<a href="https://ex.com/a.md">z</a>',
+        Path("notes/page.html"),
+    )
+    assert 'href="/notes/sub/other.html"' in body
+    assert 'href="/index.html#top"' in body
+    assert 'href="https://ex.com/a.md"' in body  # external link untouched
 
     link = {"name": "Blog", "url": "https://b.me"}
     # No homelink: a bar of links only, nothing pointing at the site root.
@@ -493,6 +596,10 @@ def selfcheck():
         pass
     else:
         assert False, "[header.homelink] without a name should refuse to build"
+
+    # 'home' shows the masthead on the homepage only; 'not home' is its inverse.
+    assert page_carries_masthead("home", True) and not page_carries_masthead("home", False)
+    assert page_carries_masthead("not home", False) and not page_carries_masthead("not home", True)
     print("selfcheck ok")
 
 
